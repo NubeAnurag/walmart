@@ -12,7 +12,10 @@ const {
   getPurchaseOrderById,
   approvePurchaseOrder,
   receiveItems,
-  getSupplierAnalytics
+  getSupplierAnalytics,
+  getSuppliersByStore,
+  getSupplierProducts,
+  debugStoreData
 } = require('../controllers/supplierController');
 const { verifyToken } = require('../middleware/auth');
 
@@ -41,7 +44,7 @@ const requireManager = (req, res, next) => {
   next();
 };
 
-// Apply rate limiting and authentication to all routes
+// Apply rate limiting and authentication to all other routes
 router.use(supplierLimiter);
 router.use(verifyToken);
 router.use(requireManager);
@@ -49,7 +52,10 @@ router.use(requireManager);
 // Supplier routes
 router.get('/', getAllSuppliers);
 router.get('/analytics', getSupplierAnalytics);
+router.get('/by-store', getSuppliersByStore);
+router.get('/debug/store-data', debugStoreData);
 router.get('/:id', getSupplierById);
+router.get('/:id/products', getSupplierProducts);
 router.post('/', createSupplier);
 router.put('/:id', updateSupplier);
 router.post('/:id/approve', approveSupplier);

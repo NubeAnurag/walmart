@@ -94,13 +94,16 @@ export const AuthProvider = ({ children }) => {
       console.log('AuthContext: Checking auth status - token:', !!token, 'user:', !!user);
 
       if (token && user) {
-        // Verify token with server
+        // Verify token with server to get fresh user data with populated fields
         console.log('AuthContext: Verifying token with server');
         const response = await authAPI.verifyToken();
         console.log('AuthContext: Token verification response:', response);
         
         if (response.success) {
-          console.log('AuthContext: Token valid, setting user as authenticated');
+          console.log('AuthContext: Token valid, updating user data');
+          // Update localStorage with fresh user data (includes populated storeId)
+          localStorage.setItem('user', JSON.stringify(response.data.user));
+          
           dispatch({
             type: AUTH_ACTIONS.LOGIN_SUCCESS,
             payload: { user: response.data.user },

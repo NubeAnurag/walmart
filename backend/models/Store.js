@@ -7,6 +7,14 @@ const storeSchema = new mongoose.Schema({
     trim: true,
     maxlength: 255
   },
+  storeCode: {
+    type: String,
+    required: true,
+    unique: true,
+    trim: true,
+    uppercase: true,
+    match: [/^STR\d{2}$/, 'Store code must be in format STR01, STR02, etc.']
+  },
   address: {
     type: String,
     required: true,
@@ -35,6 +43,7 @@ const storeSchema = new mongoose.Schema({
 
 // Index for better performance
 storeSchema.index({ name: 1 });
+storeSchema.index({ storeCode: 1 });
 storeSchema.index({ isActive: 1 });
 
 // Static method to find active stores

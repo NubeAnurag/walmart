@@ -30,7 +30,7 @@ const getDashboardOverview = async (req, res) => {
 
     // Get inventory summary
     const inventoryData = await Inventory.aggregate([
-      { $match: { storeId: mongoose.Types.ObjectId(storeId) } },
+      { $match: { storeId: new mongoose.Types.ObjectId(storeId) } },
       {
         $group: {
           _id: null,
@@ -59,7 +59,7 @@ const getDashboardOverview = async (req, res) => {
 
     // Get staff summary
     const staffData = await StaffProfile.aggregate([
-      { $match: { storeId: mongoose.Types.ObjectId(storeId), isActive: true } },
+      { $match: { storeId: new mongoose.Types.ObjectId(storeId), isActive: true } },
       {
         $group: {
           _id: null,
@@ -78,7 +78,7 @@ const getDashboardOverview = async (req, res) => {
 
     // Get task summary
     const taskData = await Task.aggregate([
-      { $match: { storeId: mongoose.Types.ObjectId(storeId) } },
+      { $match: { storeId: new mongoose.Types.ObjectId(storeId) } },
       {
         $group: {
           _id: null,
@@ -92,7 +92,7 @@ const getDashboardOverview = async (req, res) => {
                 {
                   $and: [
                     { $lt: ['$dueDate', new Date()] },
-                    { $nin: ['$status', ['completed', 'cancelled']] }
+                    { $not: { $in: ['$status', ['completed', 'cancelled']] } }
                   ]
                 },
                 1,
@@ -210,7 +210,7 @@ const getSalesAnalytics = async (req, res) => {
     const paymentMethodData = await Sale.aggregate([
       {
         $match: {
-          storeId: mongoose.Types.ObjectId(storeId),
+          storeId: new mongoose.Types.ObjectId(storeId),
           saleDate: { $gte: start, $lte: end },
           status: { $ne: 'cancelled' }
         }
@@ -229,7 +229,7 @@ const getSalesAnalytics = async (req, res) => {
     const hourlySales = await Sale.aggregate([
       {
         $match: {
-          storeId: mongoose.Types.ObjectId(storeId),
+          storeId: new mongoose.Types.ObjectId(storeId),
           saleDate: { $gte: start, $lte: end },
           status: { $ne: 'cancelled' }
         }
@@ -277,7 +277,7 @@ const getInventoryAnalytics = async (req, res) => {
 
     // Get inventory overview
     const inventoryOverview = await Inventory.aggregate([
-      { $match: { storeId: mongoose.Types.ObjectId(storeId) } },
+      { $match: { storeId: new mongoose.Types.ObjectId(storeId) } },
       {
         $lookup: {
           from: 'products',
@@ -315,7 +315,7 @@ const getInventoryAnalytics = async (req, res) => {
 
     // Get category breakdown
     const categoryBreakdown = await Inventory.aggregate([
-      { $match: { storeId: mongoose.Types.ObjectId(storeId) } },
+      { $match: { storeId: new mongoose.Types.ObjectId(storeId) } },
       {
         $lookup: {
           from: 'products',
@@ -347,7 +347,7 @@ const getInventoryAnalytics = async (req, res) => {
 
     // Get stock movement trends (simulated for now)
     const stockMovements = await Inventory.aggregate([
-      { $match: { storeId: mongoose.Types.ObjectId(storeId) } },
+      { $match: { storeId: new mongoose.Types.ObjectId(storeId) } },
       { $unwind: '$stockMovements' },
       {
         $group: {
@@ -412,7 +412,7 @@ const getPerformanceMetrics = async (req, res) => {
       Sale.aggregate([
         {
           $match: {
-            storeId: mongoose.Types.ObjectId(storeId),
+            storeId: new mongoose.Types.ObjectId(storeId),
             saleDate: { $gte: startDate, $lte: endDate },
             status: { $ne: 'cancelled' }
           }
@@ -433,7 +433,7 @@ const getPerformanceMetrics = async (req, res) => {
 
       // Inventory turnover
       Inventory.aggregate([
-        { $match: { storeId: mongoose.Types.ObjectId(storeId) } },
+        { $match: { storeId: new mongoose.Types.ObjectId(storeId) } },
         {
           $lookup: {
             from: 'products',
@@ -453,7 +453,7 @@ const getPerformanceMetrics = async (req, res) => {
 
       // Staff productivity
       StaffProfile.aggregate([
-        { $match: { storeId: mongoose.Types.ObjectId(storeId), isActive: true } },
+        { $match: { storeId: new mongoose.Types.ObjectId(storeId), isActive: true } },
         {
           $group: {
             _id: null,
@@ -544,7 +544,7 @@ const getRealTimeAlerts = async (req, res) => {
 
     // Staff performance issues
     const lowPerformingStaff = await StaffProfile.find({
-      storeId: mongoose.Types.ObjectId(storeId),
+      storeId: new mongoose.Types.ObjectId(storeId),
       isActive: true,
       'performance.rating': { $lt: 2.5 }
     }).populate('userId', 'firstName lastName');

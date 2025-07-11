@@ -89,6 +89,191 @@ export const authAPI = {
   },
 };
 
+// Store API functions
+export const storeAPI = {
+  getStores: async () => {
+    const response = await api.get('/stores');
+    return response.data;
+  },
+
+  getStore: async (storeId) => {
+    const response = await api.get(`/stores/${storeId}`);
+    return response.data;
+  },
+};
+
+// Supplier API functions
+export const supplierAPI = {
+  // Dashboard
+  getDashboardStats: async () => {
+    const response = await api.get('/supplier/dashboard/stats');
+    return response.data;
+  },
+
+  // Stores
+  getStores: async () => {
+    const response = await api.get('/supplier/stores');
+    return response.data;
+  },
+
+  // Get supplier's products
+  getSupplierProducts: async (supplierId) => {
+    const response = await api.get(`/supplier/${supplierId}/products`);
+    return response.data;
+  },
+
+  // Products
+  getProducts: async (params = {}) => {
+    const response = await api.get('/supplier/products', { params });
+    return response.data;
+  },
+
+  addProduct: async (productData) => {
+    const response = await api.post('/supplier/products', productData);
+    return response.data;
+  },
+
+  updateProduct: async (productId, productData) => {
+    const response = await api.put(`/supplier/products/${productId}`, productData);
+    return response.data;
+  },
+
+  deleteProduct: async (productId) => {
+    const response = await api.delete(`/supplier/products/${productId}`);
+    return response.data;
+  },
+
+  // Orders
+  getOrders: async (params = {}) => {
+    const response = await api.get('/supplier/orders', { params });
+    return response.data;
+  },
+
+  updateOrderStatus: async (orderId, status, notes = '') => {
+    const response = await api.put(`/supplier/orders/${orderId}/status`, { status, notes });
+    return response.data;
+  },
+
+  updateDeliveryTime: async (orderId, estimatedDeliveryTime) => {
+    const response = await api.put(`/supplier/orders/${orderId}/delivery-time`, { estimatedDeliveryTime });
+    return response.data;
+  },
+};
+
+// Manager API functions
+export const managerAPI = {
+  // Suppliers
+  getSuppliersByStore: async () => {
+    console.log('🌐 Calling getSuppliersByStore API endpoint');
+    try {
+      const response = await api.get('/suppliers/by-store');
+      console.log('📥 getSuppliersByStore raw response:', response);
+      console.log('📥 getSuppliersByStore data structure:', JSON.stringify(response.data, null, 2));
+      
+      // Check if suppliers are available at the top level
+      if (Array.isArray(response.data?.suppliers)) {
+        console.log(`📊 Found ${response.data.suppliers.length} suppliers at top level`);
+      } else if (Array.isArray(response.data?.data?.suppliers)) {
+        console.log(`📊 Found ${response.data.data.suppliers.length} suppliers in data.suppliers`);
+      } else {
+        console.log('⚠️ Could not find suppliers array in expected locations');
+      }
+      
+      return response.data;
+    } catch (error) {
+      console.error('❌ getSuppliersByStore error:', error);
+      console.error('❌ Error details:', error.response?.data);
+      throw error;
+    }
+  },
+
+  getSupplierProducts: async (supplierId, params = {}) => {
+    try {
+      const response = await api.get(`/suppliers/${supplierId}/products`, { params });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching supplier products:', error);
+      throw error;
+    }
+  },
+
+  // Analytics
+  getDashboardStats: async () => {
+    const response = await api.get('/analytics/dashboard');
+    return response.data;
+  },
+
+  // Staff
+  getStaff: async () => {
+    const response = await api.get('/staff');
+    return response.data;
+  },
+
+  // Inventory
+  getInventory: async () => {
+    const response = await api.get('/inventory');
+    return response.data;
+  },
+
+  // Reports
+  getReports: async () => {
+    const response = await api.get('/reports');
+    return response.data;
+  },
+
+  // Orders
+  placeOrder: async (orderData) => {
+    const response = await api.post('/suppliers/orders', orderData);
+    return response.data;
+  },
+};
+
+// Admin API functions
+export const adminAPI = {
+  // Dashboard
+  getDashboardStats: async () => {
+    const response = await api.get('/admin/dashboard/stats');
+    return response.data;
+  },
+
+  // Employee management
+  createEmployee: async (employeeData) => {
+    const response = await api.post('/admin/employees', employeeData);
+    return response.data;
+  },
+
+  getEmployees: async (params = {}) => {
+    const response = await api.get('/admin/employees', { params });
+    return response.data;
+  },
+
+  getEmployeesByStore: async () => {
+    const response = await api.get('/admin/employees/by-store');
+    return response.data;
+  },
+
+  getEmployee: async (employeeId) => {
+    const response = await api.get(`/admin/employees/${employeeId}`);
+    return response.data;
+  },
+
+  updateEmployee: async (employeeId, employeeData) => {
+    const response = await api.put(`/admin/employees/${employeeId}`, employeeData);
+    return response.data;
+  },
+
+  deleteEmployee: async (employeeId) => {
+    const response = await api.delete(`/admin/employees/${employeeId}`);
+    return response.data;
+  },
+
+  resetEmployeePassword: async (employeeId, newPassword = null) => {
+    const response = await api.post(`/admin/employees/${employeeId}/reset-password`, 
+      newPassword ? { password: newPassword } : {});
+    return response.data;
+  },
+};
+
 // General API functions
 export const generalAPI = {
   healthCheck: async () => {

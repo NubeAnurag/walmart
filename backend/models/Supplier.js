@@ -4,8 +4,13 @@ const supplierSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    sparse: true // Suppliers might not have user accounts
+    required: true // Link to the user account
   },
+  assignedStores: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Store',
+    required: true
+  }],
   companyName: {
     type: String,
     required: true,
@@ -162,6 +167,8 @@ const supplierSchema = new mongoose.Schema({
 });
 
 // Indexes for better performance
+supplierSchema.index({ userId: 1 });
+supplierSchema.index({ assignedStores: 1 });
 supplierSchema.index({ companyName: 1 });
 supplierSchema.index({ 'contactPerson.email': 1 });
 supplierSchema.index({ 'companyInfo.taxId': 1 });
@@ -188,7 +195,25 @@ supplierSchema.virtual('reliabilityScore').get(function() {
 
 // Static method to find active suppliers
 supplierSchema.statics.findActiveSuppliers = function() {
-  return this.find({ isActive: true, isApproved: true }).sort({ 'performance.rating': -1 });
+  return this.find({ isActive: true, isApproved: true })
+    .populate('assignedStores', 'name storeCode address')
+    .sort({ 'performance.rating': -1 });
+};
+
+// Static method to find suppliers by assigned store
+supplierSchema.statics.findByAssignedStore = function(storeId) {
+  return this.find({ 
+    assignedStores: storeId, 
+    isActive: true, 
+    isApproved: true 
+  }).populate('assignedStores', 'name storeCode address')
+    .sort({ 'performance.rating': -1 });
+};
+
+// Static method to find supplier by user ID
+supplierSchema.statics.findByUserId = function(userId) {
+  return this.findOne({ userId, isActive: true })
+    .populate('assignedStores', 'name storeCode address phone');
 };
 
 // Static method to find suppliers by category

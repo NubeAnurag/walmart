@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { X, Eye, EyeOff, Loader2, Mail, Lock, User, Phone } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Eye, EyeOff, Loader2, Mail, Lock, User, Phone, Building2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { storeAPI } from '../services/api';
 
 const RegisterModal = ({ isOpen, onClose, selectedRole, onSwitchToLogin }) => {
   const [formData, setFormData] = useState({
@@ -12,14 +13,36 @@ const RegisterModal = ({ isOpen, onClose, selectedRole, onSwitchToLogin }) => {
     lastName: '',
     phone: '',
     role: selectedRole || 'customer',
+    storeIds: [], // Changed from storeId to storeIds array
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [stores, setStores] = useState([]);
+  const [loadingStores, setLoadingStores] = useState(false);
   
   const { register, isLoading } = useAuth();
   const navigate = useNavigate();
+
+  // Fetch stores when component mounts
+  useEffect(() => {
+    const fetchStores = async () => {
+      setLoadingStores(true);
+      try {
+        const response = await storeAPI.getStores();
+        if (response.success) {
+          setStores(response.data);
+        }
+      } catch (error) {
+        console.error('Error fetching stores:', error);
+      } finally {
+        setLoadingStores(false);
+      }
+    };
+
+    fetchStores();
+  }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -84,6 +107,13 @@ const RegisterModal = ({ isOpen, onClose, selectedRole, onSwitchToLogin }) => {
       newErrors.role = 'Please select a role';
     }
     
+    // Store validation for supplier role
+    if (formData.role === 'supplier') {
+      if (formData.storeIds.length === 0) {
+        newErrors.storeIds = 'Please select at least one store for suppliers';
+      }
+    }
+    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -91,11 +121,18 @@ const RegisterModal = ({ isOpen, onClose, selectedRole, onSwitchToLogin }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!validateForm()) return;
+    console.log('🚀 Registration form submitted');
+    console.log('📝 Form data:', formData);
+    
+    if (!validateForm()) {
+      console.log('❌ Form validation failed');
+      return;
+    }
     
     setIsSubmitting(true);
     
     try {
+      console.log('📤 Calling register function...');
       const result = await register({
         email: formData.email,
         password: formData.password,
@@ -103,15 +140,26 @@ const RegisterModal = ({ isOpen, onClose, selectedRole, onSwitchToLogin }) => {
         lastName: formData.lastName,
         phone: formData.phone,
         role: formData.role,
+        storeIds: formData.storeIds,
       });
       
+      console.log('📥 Registration result:', result);
+      
       if (result.success) {
+        console.log('✅ Registration successful, closing modal and redirecting');
         onClose();
         // Redirect based on user role
         navigate(`/dashboard/${result.user.role}`);
+      } else {
+        console.log('❌ Registration failed:', result.error);
+        // Show error message to user
+        if (result.error) {
+          setErrors({ general: result.error });
+        }
       }
     } catch (error) {
-      console.error('Registration error:', error);
+      console.error('💥 Registration error:', error);
+      setErrors({ general: 'An unexpected error occurred. Please try again.' });
     } finally {
       setIsSubmitting(false);
     }
@@ -127,6 +175,7 @@ const RegisterModal = ({ isOpen, onClose, selectedRole, onSwitchToLogin }) => {
         lastName: '',
         phone: '',
         role: selectedRole || 'customer',
+        storeIds: [],
       });
       setErrors({});
       onClose();
@@ -168,6 +217,20 @@ const RegisterModal = ({ isOpen, onClose, selectedRole, onSwitchToLogin }) => {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {/* General Error Display */}
+          {errors.general && (
+            <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-4">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <X className="h-5 w-5 text-red-400" />
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm text-red-700">{errors.general}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Name Fields */}
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -270,14 +333,77 @@ const RegisterModal = ({ isOpen, onClose, selectedRole, onSwitchToLogin }) => {
               disabled={isSubmitting}
             >
               <option value="customer">Customer</option>
-              <option value="manager">Manager</option>
-              <option value="staff">Staff</option>
               <option value="supplier">Supplier</option>
             </select>
             {errors.role && (
               <p className="text-red-500 text-sm mt-1">{errors.role}</p>
             )}
+            <p className="text-sm text-gray-500 mt-1">
+              Manager and staff accounts are created by administrators only.
+            </p>
           </div>
+
+          {/* Store Selection for Suppliers */}
+          {formData.role === 'supplier' && (
+            <div>
+              <label className="label text-gray-700 mb-2 block">
+                Stores <span className="text-red-500">*</span>
+              </label>
+              <div className="space-y-2">
+                {stores.map((store) => (
+                  <div key={store.id} className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id={`store-${store.id}`}
+                      value={store.id}
+                      checked={formData.storeIds.includes(store.id)}
+                      onChange={() => {
+                        setFormData(prev => ({
+                          ...prev,
+                          storeIds: prev.storeIds.includes(store.id)
+                            ? prev.storeIds.filter(id => id !== store.id)
+                            : [...prev.storeIds, store.id]
+                        }));
+                        if (errors.storeIds) {
+                          setErrors(prev => ({
+                            ...prev,
+                            storeIds: ''
+                          }));
+                        }
+                      }}
+                      className="mr-2 h-4 w-4 text-walmart-blue focus:ring-walmart-blue border-gray-300 rounded"
+                      disabled={isSubmitting}
+                    />
+                    <label htmlFor={`store-${store.id}`} className="text-sm text-gray-700">
+                      {store.storeCode} - {store.name}
+                    </label>
+                  </div>
+                ))}
+              </div>
+              {formData.storeIds.length > 0 && (
+                <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded">
+                  <p className="text-sm text-blue-800">
+                    <strong>Selected stores ({formData.storeIds.length}):</strong>
+                  </p>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {stores
+                      .filter(store => formData.storeIds.includes(store.id))
+                      .map(store => (
+                        <span key={store.id} className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded">
+                          {store.storeCode}
+                        </span>
+                      ))}
+                  </div>
+                </div>
+              )}
+              {errors.storeIds && (
+                <p className="text-red-500 text-sm mt-1">{errors.storeIds}</p>
+              )}
+              {loadingStores && (
+                <p className="text-gray-500 text-sm mt-1">Loading stores...</p>
+              )}
+            </div>
+          )}
 
           {/* Password Fields */}
           <div className="grid grid-cols-1 gap-4">

@@ -34,36 +34,6 @@ const UserTypeSelector = ({ onSelectUserType }) => {
       stats: '10M+ Users'
     },
     {
-      id: 'manager',
-      title: 'Manager',
-      subtitle: 'Command Center Dashboard',
-      description: 'Powerful analytics and AI-driven insights to optimize operations and boost performance.',
-      icon: BarChart3,
-      color: 'from-blue-500 to-indigo-600',
-      hoverColor: 'hover:from-blue-600 hover:to-indigo-700',
-      features: ['Sales Analytics', 'AI Recommendations', 'Staff Management', 'Inventory Alerts'],
-      bgGradient: 'from-blue-50 to-indigo-50',
-      iconBg: 'from-blue-500 to-indigo-600',
-      badge: 'Enterprise',
-      badgeColor: 'bg-blue-500',
-      stats: '500+ Stores'
-    },
-    {
-      id: 'staff',
-      title: 'Staff',
-      subtitle: 'Efficient Operations',
-      description: 'Streamlined tools for enhanced productivity, customer service, and performance tracking.',
-      icon: Headphones,
-      color: 'from-orange-500 to-red-600',
-      hoverColor: 'hover:from-orange-600 hover:to-red-700',
-      features: ['Smart Scheduling', 'Customer Assistance', 'Auto Attendance', 'Performance Metrics'],
-      bgGradient: 'from-orange-50 to-red-50',
-      iconBg: 'from-orange-500 to-red-600',
-      badge: 'Team Favorite',
-      badgeColor: 'bg-orange-500',
-      stats: '50K+ Staff'
-    },
-    {
       id: 'supplier',
       title: 'Supplier',
       subtitle: 'Performance Tracking',
@@ -77,6 +47,27 @@ const UserTypeSelector = ({ onSelectUserType }) => {
       badge: 'Professional',
       badgeColor: 'bg-purple-500',
       stats: '1K+ Partners'
+    },
+  ];
+
+  const restrictedTypes = [
+    {
+      id: 'manager',
+      title: 'Manager',
+      subtitle: 'Admin Access Only',
+      description: 'Manager accounts are created and managed by administrators through the admin panel.',
+      icon: BarChart3,
+      features: ['Sales Analytics', 'AI Recommendations', 'Staff Management', 'Inventory Alerts'],
+      stats: '500+ Stores'
+    },
+    {
+      id: 'staff',
+      title: 'Staff',
+      subtitle: 'Admin Access Only',
+      description: 'Staff accounts are created and managed by administrators through the admin panel.',
+      icon: Headphones,
+      features: ['Smart Scheduling', 'Customer Assistance', 'Auto Attendance', 'Performance Metrics'],
+      stats: '50K+ Staff'
     },
   ];
 
@@ -97,8 +88,8 @@ const UserTypeSelector = ({ onSelectUserType }) => {
         </p>
       </div>
 
-      {/* User Type Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
+      {/* Available User Type Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
         {userTypes.map((type, index) => {
           const IconComponent = type.icon;
           const isHovered = hoveredCard === type.id;
@@ -199,6 +190,88 @@ const UserTypeSelector = ({ onSelectUserType }) => {
             </div>
           );
         })}
+      </div>
+
+      {/* Admin-Only Access Section */}
+      <div className="mb-12">
+        <div className="text-center mb-8">
+          <h3 className="text-2xl font-bold text-gray-800 mb-2">
+            Admin-Only Access
+          </h3>
+          <p className="text-gray-600">
+            These roles are managed exclusively by administrators
+          </p>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {restrictedTypes.map((type, index) => {
+            const IconComponent = type.icon;
+            
+            return (
+              <div
+                key={type.id}
+                className="relative bg-gradient-to-br from-gray-50 to-gray-100 border-2 border-gray-200 rounded-2xl p-8 opacity-75"
+                style={{
+                  animationDelay: `${index * 0.1}s`
+                }}
+              >
+                {/* Restricted Badge */}
+                <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-gray-500 text-white px-4 py-1 rounded-full text-xs font-semibold shadow-lg">
+                  Admin Only
+                </div>
+
+                {/* Icon */}
+                <div className="relative mb-6">
+                  <div className="w-20 h-20 bg-gradient-to-br from-gray-400 to-gray-500 rounded-2xl flex items-center justify-center mx-auto shadow-lg">
+                    <IconComponent className="w-10 h-10 text-white" />
+                  </div>
+                </div>
+
+                {/* Content */}
+                <div className="text-center">
+                  <h3 className="text-2xl font-bold text-gray-700 mb-2">
+                    {type.title}
+                  </h3>
+                  
+                  <p className="text-sm font-semibold text-gray-500 mb-3 uppercase tracking-wide">
+                    {type.subtitle}
+                  </p>
+                  
+                  <p className="text-gray-600 mb-6 leading-relaxed">
+                    {type.description}
+                  </p>
+
+                  {/* Stats */}
+                  <div className="mb-6">
+                    <div className="inline-flex items-center bg-white/70 rounded-full px-4 py-2 text-sm font-semibold text-gray-600">
+                      <Settings className="w-4 h-4 text-gray-500 mr-2" />
+                      {type.stats}
+                    </div>
+                  </div>
+
+                  {/* Features */}
+                  <div className="space-y-3 mb-8">
+                    {type.features.map((feature, featureIndex) => (
+                      <div 
+                        key={featureIndex} 
+                        className="flex items-center text-sm text-gray-600 bg-white/50 rounded-lg px-3 py-2"
+                      >
+                        <CheckCircle className="w-4 h-4 text-gray-400 mr-3 flex-shrink-0" />
+                        <span className="font-medium">{feature}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Disabled Button */}
+                  <div className="bg-gray-300 text-gray-500 rounded-xl py-4 px-6 font-semibold cursor-not-allowed">
+                    <Settings className="w-5 h-5 mr-2 inline" />
+                    Admin Access Required
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* Bottom Section */}

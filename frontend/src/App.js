@@ -4,7 +4,12 @@ import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
+import AdminPage from './pages/AdminPage';
+import AdminLoginPage from './pages/AdminLoginPage';
+import ManagerLoginPage from './pages/ManagerLoginPage';
+import StaffLoginPage from './pages/StaffLoginPage';
 import ManagerDashboard from './components/ManagerDashboard';
+import SupplierDashboard from './components/SupplierDashboard';
 import './index.css';
 
 // Protected Route Component
@@ -113,34 +118,6 @@ const StaffDashboard = () => {
   );
 };
 
-const SupplierDashboard = () => {
-  const { user, logout } = useAuth();
-  
-  return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold text-gray-800">Supplier Dashboard</h1>
-          <button 
-            onClick={logout}
-            className="btn btn-secondary"
-          >
-            Logout
-          </button>
-        </div>
-        <div className="bg-white rounded-lg shadow p-6">
-          <p className="text-gray-600">Welcome, {user.firstName} {user.lastName}! 🚚</p>
-          <p className="text-sm text-walmart-blue font-medium mb-2">Role: Supplier</p>
-          <p className="text-sm text-gray-500 mt-2">
-            Phase 1 Complete: Authentication System ✅<br/>
-            Coming Soon: Performance Tracking, Order Management, Business Analytics
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 // 404 Page
 const NotFound = () => (
   <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -190,6 +167,30 @@ function App() {
                 </PublicRoute>
               } 
             />
+            <Route 
+              path="/login/admin" 
+              element={
+                <PublicRoute>
+                  <AdminLoginPage />
+                </PublicRoute>
+              } 
+            />
+            <Route 
+              path="/login/manager" 
+              element={
+                <PublicRoute>
+                  <ManagerLoginPage />
+                </PublicRoute>
+              } 
+            />
+            <Route 
+              path="/login/staff" 
+              element={
+                <PublicRoute>
+                  <StaffLoginPage />
+                </PublicRoute>
+              } 
+            />
 
             {/* Protected Dashboard Routes */}
             <Route 
@@ -221,6 +222,14 @@ function App() {
               element={
                 <ProtectedRoute allowedRoles={['supplier']}>
                   <SupplierDashboard />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/dashboard/admin" 
+              element={
+                <ProtectedRoute allowedRoles={['admin']}>
+                  <AdminPage />
                 </ProtectedRoute>
               } 
             />

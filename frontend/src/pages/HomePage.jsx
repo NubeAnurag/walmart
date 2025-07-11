@@ -6,6 +6,7 @@ import WelcomeSection from '../components/WelcomeSection';
 import UserTypeSelector from '../components/UserTypeSelector';
 import LoginModal from '../components/LoginModal';
 import RegisterModal from '../components/RegisterModal';
+import AdminLoginInfo from '../components/AdminLoginInfo';
 
 const HomePage = () => {
   const [selectedRole, setSelectedRole] = useState(null);
@@ -111,7 +112,10 @@ const HomePage = () => {
         
         {/* User Type Selector */}
         <section className="py-20 bg-white">
-          <UserTypeSelector onSelectUserType={handleSelectUserType} />
+          <div className="max-w-4xl mx-auto px-4">
+            <AdminLoginInfo />
+            <UserTypeSelector onSelectUserType={handleSelectUserType} />
+          </div>
         </section>
 
         {/* Features Section */}

@@ -34,8 +34,36 @@ const userSchema = new mongoose.Schema({
   role: {
     type: String,
     required: true,
-    enum: ['customer', 'manager', 'staff', 'supplier'],
+    enum: ['customer', 'manager', 'staff', 'supplier', 'admin'],
     default: 'customer'
+  },
+  employeeId: {
+    type: String,
+    unique: true,
+    sparse: true, // Allows multiple null values
+    required: function() {
+      return ['manager', 'staff'].includes(this.role);
+    }
+  },
+  storeId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Store',
+    required: function() {
+      return ['manager', 'staff'].includes(this.role);
+    }
+  },
+  storeIds: {
+    type: [mongoose.Schema.Types.ObjectId],
+    ref: 'Store',
+    required: function() {
+      return this.role === 'supplier';
+    },
+    validate: {
+      validator: function(v) {
+        return this.role !== 'supplier' || (Array.isArray(v) && v.length > 0);
+      },
+      message: 'Suppliers must be associated with at least one store'
+    }
   },
   firstName: {
     type: String,
@@ -78,6 +106,8 @@ userSchema.index({ email: 1 });
 userSchema.index({ googleId: 1 });
 userSchema.index({ role: 1 });
 userSchema.index({ isActive: 1 });
+userSchema.index({ storeId: 1 });
+userSchema.index({ employeeId: 1 });
 
 // Pre-save middleware to hash password
 userSchema.pre('save', async function(next) {
@@ -117,6 +147,11 @@ userSchema.statics.findByIdActive = function(id) {
 // Static method to find users by role
 userSchema.statics.findByRole = function(role) {
   return this.find({ role, isActive: true }).select('-password').sort({ createdAt: -1 });
+};
+
+// Static method to find users by store
+userSchema.statics.findByStore = function(storeId) {
+  return this.find({ storeId, isActive: true }).select('-password').populate('storeId').sort({ createdAt: -1 });
 };
 
 // Static method to deactivate user (soft delete)

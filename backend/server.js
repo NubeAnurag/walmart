@@ -17,9 +17,12 @@ const authRoutes = require('./routes/auth');
 const staffRoutes = require('./routes/staff');
 const analyticsRoutes = require('./routes/analytics');
 const supplierRoutes = require('./routes/suppliers');
+const supplierDashboardRoutes = require('./routes/supplier');
 const inventoryRoutes = require('./routes/inventory');
 const reportsRoutes = require('./routes/reports');
 const customerInsightsRoutes = require('./routes/customerInsights');
+const storeRoutes = require('./routes/stores');
+const adminRoutes = require('./routes/admin');
 
 const app = express();
 const server = http.createServer(app);
@@ -88,6 +91,9 @@ app.use(session({
 // Apply global rate limiting
 app.use(globalLimiter);
 
+// Serve static files for uploads
+app.use('/uploads', express.static('uploads'));
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({
@@ -104,9 +110,12 @@ app.use('/api/auth', authRoutes);
 app.use('/api/staff', staffRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/suppliers', supplierRoutes);
+app.use('/api/supplier', supplierDashboardRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/customer-insights', customerInsightsRoutes);
+app.use('/api/stores', storeRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Test database connection endpoint
 app.get('/api/test-db', async (req, res) => {

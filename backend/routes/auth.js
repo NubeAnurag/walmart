@@ -5,6 +5,7 @@ const jwt = require('jsonwebtoken');
 const { 
   register, 
   login, 
+  adminLogin,
   logout, 
   verifyToken, 
   getProfile, 
@@ -14,6 +15,7 @@ const {
 const { 
   registerValidation, 
   loginValidation, 
+  adminLoginValidation,
   updateUserValidation 
 } = require('../middleware/validation');
 const { verifyToken: authMiddleware } = require('../middleware/auth');
@@ -46,6 +48,7 @@ const generalLimiter = rateLimit({
 // Public routes
 router.post('/register', authLimiter, registerValidation, register);
 router.post('/login', authLimiter, loginValidation, login);
+router.post('/admin/login', authLimiter, adminLoginValidation, adminLogin);
 router.post('/logout', generalLimiter, logout);
 
 // Google OAuth credential verification

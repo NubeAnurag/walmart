@@ -1,7 +1,51 @@
 const Supplier = require('../models/Supplier');
 const PurchaseOrder = require('../models/PurchaseOrder');
 const Product = require('../models/Product');
+const Order = require('../models/Order');
+const User = require('../models/User');
+const Store = require('../models/Store');
 const mongoose = require('mongoose');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs').promises;
+const { uploadImageToCloudinary, deleteImageFromCloudinary } = require('../utils/cloudinaryUpload');
+
+// Configure multer for image uploads
+const storage = multer.diskStorage({
+  destination: async (req, file, cb) => {
+    const uploadPath = path.join(__dirname, '../uploads/products');
+    try {
+      await fs.mkdir(uploadPath, { recursive: true });
+      cb(null, uploadPath);
+    } catch (error) {
+      cb(error);
+    }
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, 'product-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const fileFilter = (req, file, cb) => {
+  const allowedTypes = /jpeg|jpg|png|webp/;
+  const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+  const mimetype = allowedTypes.test(file.mimetype);
+
+  if (mimetype && extname) {
+    return cb(null, true);
+  } else {
+    cb(new Error('Only JPEG, PNG, and WebP images are allowed'));
+  }
+};
+
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB limit
+  },
+  fileFilter: fileFilter
+});
 
 // Get all suppliers
 const getAllSuppliers = async (req, res) => {
@@ -651,7 +695,688 @@ const getSupplierAnalytics = async (req, res) => {
   }
 };
 
+// Dashboard Overview
+const getDashboardStats = async (req, res) => {
+  try {
+    const supplierId = req.user.id || req.user._id;
+
+    // Get supplier's rating (average from all products)
+    const supplierRating = await Product.aggregate([
+      { $match: { supplierId: new mongoose.Types.ObjectId(supplierId) } },
+      {
+        $group: {
+          _id: null,
+          averageRating: { $avg: '$rating.average' },
+          totalRatings: { $sum: '$rating.count' }
+        }
+      }
+    ]);
+
+    // Get associated stores from Supplier model
+    const supplier = await Supplier.findByUserId(supplierId);
+    
+    // Get product stats
+    const productStats = await Product.aggregate([
+      { $match: { supplierId: new mongoose.Types.ObjectId(supplierId), isActive: true } },
+      {
+        $group: {
+          _id: null,
+          totalProducts: { $sum: 1 },
+          totalStock: { $sum: '$stock' },
+          outOfStock: {
+            $sum: { $cond: [{ $eq: ['$stock', 0] }, 1, 0] }
+          },
+          averagePrice: { $avg: '$price' }
+        }
+      }
+    ]);
+
+    // Get order stats for last 30 days
+    const orderStats = await Order.getOrderStats(supplierId, '30d');
+
+    // Get recent orders
+    const recentOrders = await Order.findBySupplier(supplierId, { limit: 5 });
+
+    res.json({
+      success: true,
+      data: {
+        rating: {
+          average: supplierRating[0]?.averageRating || 0,
+          count: supplierRating[0]?.totalRatings || 0
+        },
+        stores: supplier?.assignedStores || [],
+        productStats: productStats[0] || {
+          totalProducts: 0,
+          totalStock: 0,
+          outOfStock: 0,
+          averagePrice: 0
+        },
+        orderStats: orderStats,
+        recentOrders: recentOrders
+      }
+    });
+
+  } catch (error) {
+    console.error('Dashboard stats error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching dashboard statistics'
+    });
+  }
+};
+
+// Product Management
+const getProducts = async (req, res) => {
+  try {
+    const supplierId = req.user.id || req.user._id;
+    const { category, search, page = 1, limit = 20 } = req.query;
+
+    const options = {
+      category,
+      search,
+      limit: parseInt(limit),
+      sort: { createdAt: -1 }
+    };
+
+    const products = await Product.findBySupplier(supplierId, options);
+    const total = await Product.countDocuments({ 
+      supplierId, 
+      isActive: true,
+      ...(category && { category }),
+      ...(search && { $text: { $search: search } })
+    });
+
+    res.json({
+      success: true,
+      data: {
+        products,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          pages: Math.ceil(total / parseInt(limit))
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Get products error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching products'
+    });
+  }
+};
+
+const addProduct = async (req, res) => {
+  try {
+    const supplierId = req.user.id || req.user._id;
+    const { name, description, price, category, brand, stock, image } = req.body;
+
+    // Validate required fields
+    if (!name || !description || !price || !category || !brand || stock === undefined) {
+      return res.status(400).json({
+        success: false,
+        message: 'All required fields must be provided: name, description, price, category, brand, stock'
+      });
+    }
+
+    // Get supplier's assigned stores from Supplier model
+    const supplier = await Supplier.findByUserId(supplierId);
+    if (!supplier) {
+      return res.status(404).json({
+        success: false,
+        message: 'Supplier profile not found'
+      });
+    }
+
+    if (!supplier.assignedStores || supplier.assignedStores.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No stores assigned to this supplier. Please contact administrator.'
+      });
+    }
+
+    // Handle image upload to Cloudinary if provided
+    let imageData = null;
+    if (image) {
+      if (typeof image !== 'string' || !image.startsWith('data:image/')) {
+        return res.status(400).json({
+          success: false,
+          message: 'Image must be a valid base64 data URL starting with data:image/'
+        });
+      }
+
+      try {
+        // Upload image to Cloudinary
+        const cloudinaryResult = await uploadImageToCloudinary(image, 'walmart-products');
+        imageData = {
+          url: cloudinaryResult.url,
+          publicId: cloudinaryResult.publicId,
+          format: cloudinaryResult.format,
+          width: cloudinaryResult.width,
+          height: cloudinaryResult.height,
+          bytes: cloudinaryResult.bytes
+        };
+      } catch (error) {
+        console.error('Image upload error:', error);
+        return res.status(500).json({
+          success: false,
+          message: 'Failed to upload image. Please try again.'
+        });
+      }
+    }
+
+    const product = new Product({
+      name: name.trim(),
+      description: description.trim(),
+      price: parseFloat(price),
+      category,
+      brand: brand.trim(),
+      stock: parseInt(stock),
+      image: imageData,
+      supplierId,
+      storeIds: supplier.assignedStores.map(store => store._id)
+    });
+
+    await product.save();
+    await product.populate('storeIds', 'name storeCode');
+
+    res.status(201).json({
+      success: true,
+      message: 'Product added successfully',
+      data: { product }
+    });
+
+  } catch (error) {
+    console.error('Add product error:', error);
+    
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map(err => {
+        if (err.path === 'description' && err.kind === 'maxlength') {
+          return `Description is too long. Maximum ${err.properties.maxlength} characters allowed, but got ${err.value.length} characters.`;
+        }
+        if (err.path === 'name' && err.kind === 'maxlength') {
+          return `Product name is too long. Maximum ${err.properties.maxlength} characters allowed.`;
+        }
+        return err.message;
+      });
+      return res.status(400).json({
+        success: false,
+        message: 'Product validation failed',
+        errors: messages
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Error adding product'
+    });
+  }
+};
+
+const updateProduct = async (req, res) => {
+  try {
+    const supplierId = req.user.id || req.user._id;
+    const { productId } = req.params;
+    const { name, description, price, category, brand, stock, image } = req.body;
+
+    const product = await Product.findOne({ _id: productId, supplierId });
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found or access denied'
+      });
+    }
+
+    // Update fields
+    if (name) product.name = name.trim();
+    if (description) product.description = description.trim();
+    if (price !== undefined) product.price = parseFloat(price);
+    if (category) product.category = category;
+    if (brand) product.brand = brand.trim();
+    if (stock !== undefined) product.stock = parseInt(stock);
+
+    // Handle image update with Cloudinary
+    if (image !== undefined) {
+      if (image === null || image === '') {
+        // Remove image from Cloudinary if it exists
+        if (product.image && product.image.publicId) {
+          try {
+            await deleteImageFromCloudinary(product.image.publicId);
+          } catch (error) {
+            console.error('Error deleting old image:', error);
+            // Continue anyway - don't fail the update
+          }
+        }
+        product.image = null;
+      } else {
+        // Validate and upload new image
+        if (typeof image !== 'string' || !image.startsWith('data:image/')) {
+          return res.status(400).json({
+            success: false,
+            message: 'Image must be a valid base64 data URL starting with data:image/'
+          });
+        }
+
+        try {
+          // Delete old image from Cloudinary if it exists
+          if (product.image && product.image.publicId) {
+            try {
+              await deleteImageFromCloudinary(product.image.publicId);
+            } catch (error) {
+              console.error('Error deleting old image:', error);
+              // Continue anyway - don't fail the update
+            }
+          }
+
+          // Upload new image to Cloudinary
+          const cloudinaryResult = await uploadImageToCloudinary(image, 'walmart-products');
+          product.image = {
+            url: cloudinaryResult.url,
+            publicId: cloudinaryResult.publicId,
+            format: cloudinaryResult.format,
+            width: cloudinaryResult.width,
+            height: cloudinaryResult.height,
+            bytes: cloudinaryResult.bytes
+          };
+        } catch (error) {
+          console.error('Image upload error:', error);
+          return res.status(500).json({
+            success: false,
+            message: 'Failed to upload image. Please try again.'
+          });
+        }
+      }
+    }
+
+    await product.save();
+    await product.populate('storeIds', 'name storeCode');
+
+    res.json({
+      success: true,
+      message: 'Product updated successfully',
+      data: { product }
+    });
+
+  } catch (error) {
+    console.error('Update product error:', error);
+    
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({
+        success: false,
+        message: 'Validation error',
+        errors: messages
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Error updating product'
+    });
+  }
+};
+
+const deleteProduct = async (req, res) => {
+  try {
+    const supplierId = req.user.id || req.user._id;
+    const { productId } = req.params;
+
+    const product = await Product.findOne({ _id: productId, supplierId });
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found or access denied'
+      });
+    }
+
+    // Delete image from Cloudinary if it exists
+    if (product.image && product.image.publicId) {
+      try {
+        await deleteImageFromCloudinary(product.image.publicId);
+      } catch (error) {
+        console.error('Error deleting image from Cloudinary:', error);
+        // Continue anyway - don't fail the deletion
+      }
+    }
+
+    // Soft delete
+    product.isActive = false;
+    await product.save();
+
+    res.json({
+      success: true,
+      message: 'Product deleted successfully'
+    });
+
+  } catch (error) {
+    console.error('Delete product error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error deleting product'
+    });
+  }
+};
+
+// Order Management
+const getOrders = async (req, res) => {
+  try {
+    const supplierId = req.user.id || req.user._id;
+    const { status, storeId, page = 1, limit = 20 } = req.query;
+
+    const options = {
+      status,
+      storeId,
+      limit: parseInt(limit),
+      sort: { createdAt: -1 }
+    };
+
+    const orders = await Order.findBySupplier(supplierId, options);
+    const total = await Order.countDocuments({ 
+      supplierId, 
+      isActive: true,
+      ...(status && { status }),
+      ...(storeId && { storeId })
+    });
+
+    res.json({
+      success: true,
+      data: {
+        orders,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          pages: Math.ceil(total / parseInt(limit))
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Get orders error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching orders'
+    });
+  }
+};
+
+const updateOrderStatus = async (req, res) => {
+  try {
+    const supplierId = req.user.id || req.user._id;
+    const { orderId } = req.params;
+    const { status, notes } = req.body;
+
+    const order = await Order.findOne({ _id: orderId, supplierId });
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found or access denied'
+      });
+    }
+
+    if (!['Order Received', 'Order Completed', 'Order Rejected'].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid order status'
+      });
+    }
+
+    await order.updateStatus(status, supplierId, notes);
+
+    res.json({
+      success: true,
+      message: 'Order status updated successfully',
+      data: { order }
+    });
+
+  } catch (error) {
+    console.error('Update order status error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error updating order status'
+    });
+  }
+};
+
+const updateDeliveryTime = async (req, res) => {
+  try {
+    const supplierId = req.user.id || req.user._id;
+    const { orderId } = req.params;
+    const { estimatedDeliveryTime } = req.body;
+
+    const order = await Order.findOne({ _id: orderId, supplierId });
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found or access denied'
+      });
+    }
+
+    await order.updateDeliveryTime(estimatedDeliveryTime, supplierId);
+
+    res.json({
+      success: true,
+      message: 'Delivery time updated successfully',
+      data: { order }
+    });
+
+  } catch (error) {
+    console.error('Update delivery time error:', error);
+    res.status(400).json({
+      success: false,
+      message: error.message || 'Error updating delivery time'
+    });
+  }
+};
+
+// Get supplier's stores
+const getSupplierStores = async (req, res) => {
+  try {
+    const supplierId = req.user.id || req.user._id;
+    
+    // Get supplier profile from Supplier model
+    const supplier = await Supplier.findByUserId(supplierId);
+
+    if (!supplier) {
+      return res.status(404).json({
+        success: false,
+        message: 'Supplier profile not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        stores: supplier.assignedStores || []
+      }
+    });
+
+  } catch (error) {
+    console.error('Get supplier stores error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching stores'
+    });
+  }
+};
+
+// Get suppliers by store (for managers)
+const getSuppliersByStore = async (req, res) => {
+  try {
+    const storeId = req.user.storeId;
+    const userId = req.user.id || req.user._id;
+    
+    console.log('🔍 getSuppliersByStore Debug:');
+    console.log('User ID:', userId);
+    console.log('Store ID:', storeId);
+    console.log('User Role:', req.user.role);
+    
+    if (!storeId) {
+      console.log('❌ Manager has no store assigned');
+      return res.status(400).json({
+        success: false,
+        message: 'Manager must be assigned to a store'
+      });
+    }
+
+    // Find suppliers assigned to the manager's store
+    const suppliers = await Supplier.find({
+      assignedStores: storeId,
+      isActive: true,
+      isApproved: true
+    }).populate('assignedStores', 'name storeCode').populate('userId', 'firstName lastName email');
+
+    console.log(`📊 Found ${suppliers.length} suppliers for store ${storeId}`);
+    console.log('📊 Full suppliers array:', JSON.stringify(suppliers, null, 2).substring(0, 200) + '...');
+    
+    suppliers.forEach(supplier => {
+      console.log(`  - ${supplier.companyName} (Active: ${supplier.isActive}, Approved: ${supplier.isApproved})`);
+    });
+
+    // Return suppliers in a consistent format - at both top level and in data object
+    const responseData = {
+      success: true,
+      suppliers: suppliers, // Direct access at top level
+      data: {
+        suppliers: suppliers, // Also include in data for backward compatibility
+        debug: {
+          storeId,
+          userId,
+          role: req.user.role,
+          totalSuppliers: suppliers.length
+        }
+      }
+    };
+
+    console.log('📤 Sending response with suppliers:', responseData.suppliers.length);
+    res.json(responseData);
+
+  } catch (error) {
+    console.error('Get suppliers by store error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching suppliers for store',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
+  }
+};
+
+// Debug endpoint to check store data relationships
+const debugStoreData = async (req, res) => {
+  try {
+    const userId = req.user.id || req.user._id;
+    const userStoreId = req.user.storeId;
+    
+    // Get current user details
+    const currentUser = await User.findById(userId).populate('storeId');
+    
+    // Get all suppliers
+    const allSuppliers = await Supplier.find({}).populate('assignedStores', 'name storeCode');
+    
+    // Get all stores
+    const allStores = await Store.find({});
+    
+    // Get suppliers for user's store specifically
+    const suppliersForStore = await Supplier.find({
+      assignedStores: userStoreId,
+      isActive: true,
+      isApproved: true
+    }).populate('assignedStores', 'name storeCode');
+
+    res.json({
+      success: true,
+      debug: {
+        currentUser: {
+          id: userId,
+          role: currentUser.role,
+          storeId: userStoreId,
+          storeName: currentUser.storeId?.name,
+          storeCode: currentUser.storeId?.storeCode
+        },
+        allStores: allStores.map(store => ({
+          id: store._id,
+          name: store.name,
+          storeCode: store.storeCode
+        })),
+        allSuppliers: allSuppliers.map(supplier => ({
+          id: supplier._id,
+          companyName: supplier.companyName,
+          isActive: supplier.isActive,
+          isApproved: supplier.isApproved,
+          assignedStores: supplier.assignedStores.map(store => ({
+            id: store._id,
+            name: store.name,
+            storeCode: store.storeCode
+          }))
+        })),
+        suppliersForUserStore: suppliersForStore.map(supplier => ({
+          id: supplier._id,
+          companyName: supplier.companyName,
+          assignedStores: supplier.assignedStores.map(store => ({
+            id: store._id,
+            name: store.name,
+            storeCode: store.storeCode
+          }))
+        })),
+        query: {
+          assignedStores: userStoreId,
+          isActive: true,
+          isApproved: true
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Debug store data error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching debug data',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
+  }
+};
+
+/**
+ * Get products for a specific supplier
+ * @route GET /api/supplier/:supplierId/products
+ * @access Private
+ */
+const getSupplierProducts = async (req, res) => {
+  try {
+    const { supplierId } = req.params;
+    
+    // Validate supplierId
+    if (!supplierId) {
+      return res.status(400).json({ message: 'Supplier ID is required' });
+    }
+
+    // Find supplier and their products
+    const supplier = await Supplier.findById(supplierId);
+    if (!supplier) {
+      return res.status(404).json({ message: 'Supplier not found' });
+    }
+
+    // Get all products associated with this supplier
+    const products = await Product.find({ supplier: supplierId })
+      .select('name description price stockQuantity image category')
+      .sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      products,
+      message: 'Products retrieved successfully'
+    });
+  } catch (error) {
+    console.error('Get supplier products error:', error);
+    res.status(500).json({ message: 'Error fetching supplier products', error: error.message });
+  }
+};
+
+
 module.exports = {
+  // Old functions for manager use
   getAllSuppliers,
   getSupplierById,
   createSupplier,
@@ -663,5 +1388,25 @@ module.exports = {
   getPurchaseOrderById,
   approvePurchaseOrder,
   receiveItems,
-  getSupplierAnalytics
+  getSupplierAnalytics,
+  getSuppliersByStore,
+  getSupplierProducts,
+  debugStoreData,
+  
+  // New functions for supplier dashboard
+  getDashboardStats,
+  
+  // Product Management
+  getProducts,
+  addProduct,
+  updateProduct,
+  deleteProduct,
+  
+  // Order Management
+  getOrders,
+  updateOrderStatus,
+  updateDeliveryTime,
+  
+  // Utility
+  getSupplierStores
 }; 

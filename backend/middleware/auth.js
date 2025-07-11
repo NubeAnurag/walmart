@@ -14,7 +14,7 @@ const verifyToken = async (req, res, next) => {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findByIdActive(decoded.id);
+    const user = await User.findByIdActive(decoded.id).populate('storeId');
     
     if (!user) {
       return res.status(401).json({
@@ -79,7 +79,7 @@ const optionalAuth = async (req, res, next) => {
     
     if (token) {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      const user = await User.findByIdActive(decoded.id);
+      const user = await User.findByIdActive(decoded.id).populate('storeId');
       req.user = user;
     }
     

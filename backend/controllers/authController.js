@@ -15,7 +15,15 @@ const generateToken = (id) => {
 // Register new user
 const register = async (req, res) => {
   try {
-    const { email, password, role, firstName, lastName, phone } = req.body;
+    const { email, password, role, firstName, lastName, phone, storeIds } = req.body;
+
+    // Restrict manager and staff registration to admin only
+    if (['manager', 'staff'].includes(role)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Manager and staff accounts can only be created by administrators. Please contact your HR department.'
+      });
+    }
 
     // Check if user already exists
     const existingUser = await User.findByEmail(email);
@@ -26,17 +34,68 @@ const register = async (req, res) => {
       });
     }
 
-    // Create new user
+    // Validate store IDs for suppliers
+    if (role === 'supplier') {
+      if (!storeIds || !Array.isArray(storeIds) || storeIds.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'At least one store selection is required for suppliers'
+        });
+      }
+      
+      // Verify all stores exist
+      const Store = require('../models/Store');
+      const stores = await Store.find({ _id: { $in: storeIds }, isActive: true });
+      if (stores.length !== storeIds.length) {
+        return res.status(400).json({
+          success: false,
+          message: 'One or more selected stores are not valid'
+        });
+      }
+    }
+
+    // Create new user (only customers and suppliers can self-register)
     const user = new User({
       email,
       password,
       role,
       firstName,
       lastName,
-      phone
+      phone,
+      storeIds: role === 'supplier' ? storeIds : undefined
     });
 
     await user.save();
+
+    // If user is a supplier, create a supplier profile
+    if (role === 'supplier') {
+      const Supplier = require('../models/Supplier');
+      
+      // Create basic supplier profile
+      const supplierProfile = new Supplier({
+        userId: user._id,
+        assignedStores: storeIds,
+        companyName: `${firstName} ${lastName}'s Company`, // Default company name
+        contactPerson: {
+          name: `${firstName} ${lastName}`,
+          email: email,
+          phone: phone || '',
+          title: 'Owner'
+        },
+        companyInfo: {
+          industry: 'General',
+          establishedYear: new Date().getFullYear()
+        },
+        address: {
+          country: 'USA'
+        },
+        categories: ['Other'], // Default category
+        isActive: true,
+        isApproved: false // Requires approval
+      });
+
+      await supplierProfile.save();
+    }
 
     // Generate token
     const token = generateToken(user._id);
@@ -91,7 +150,9 @@ const login = async (req, res) => {
     const { email, password, role } = req.body;
 
     // Find user by email (includes password for verification)
-    const user = await User.findOne({ email: email.toLowerCase(), isActive: true });
+    const user = await User.findOne({ email: email.toLowerCase(), isActive: true })
+      .populate('storeId')
+      .populate('storeIds');
     if (!user) {
       return res.status(401).json({
         success: false,
@@ -141,6 +202,69 @@ const login = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Server error during login'
+    });
+  }
+};
+
+// Admin login with enhanced security
+const adminLogin = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    // Find admin user by email
+    const user = await User.findOne({ 
+      email: email.toLowerCase(), 
+      role: 'admin',
+      isActive: true 
+    });
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid admin credentials'
+      });
+    }
+
+    // Verify password
+    const isPasswordValid = await user.verifyPassword(password);
+    if (!isPasswordValid) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid admin credentials'
+      });
+    }
+
+    // Generate token with shorter expiry for admin
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+      expiresIn: '4h' // Admin tokens expire in 4 hours for security
+    });
+
+    // Set cookie with shorter expiry
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 4 * 60 * 60 * 1000 // 4 hours
+    });
+
+    // Log admin login for security audit
+    console.log(`Admin login: ${email} at ${new Date().toISOString()}`);
+
+    res.json({
+      success: true,
+      message: 'Admin login successful',
+      data: {
+        user: user.toJSON(),
+        token,
+        expiresIn: '4h'
+      }
+    });
+
+  } catch (error) {
+    console.error('Admin login error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error during admin login'
     });
   }
 };
@@ -250,10 +374,10 @@ const updateProfile = async (req, res) => {
   }
 };
 
-// Google OAuth credential verification
+  // Google OAuth credential verification
 const googleVerify = async (req, res) => {
   try {
-    const { credential, role } = req.body;
+    const { credential, role, storeIds } = req.body;
 
     if (!credential) {
       return res.status(400).json({
@@ -277,6 +401,10 @@ const googleVerify = async (req, res) => {
 
     // Check if user already exists with this Google ID
     let user = await User.findByGoogleId(googleId);
+    if (user) {
+      // Populate store information
+      user = await User.findById(user._id).populate('storeId');
+    }
     
     if (user) {
       // Validate role - user can only login with their registered role
@@ -312,6 +440,9 @@ const googleVerify = async (req, res) => {
     user = await User.findByEmail(email);
     
     if (user) {
+      // Populate store information
+      user = await User.findById(user._id).populate('storeId');
+      
       // Validate role - user can only login with their registered role
       if (role && user.role !== role) {
         return res.status(403).json({
@@ -346,7 +477,35 @@ const googleVerify = async (req, res) => {
       });
     }
     
-    // Create new user
+    // Restrict manager and staff registration to admin only
+    if (['manager', 'staff'].includes(role)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Manager and staff accounts can only be created by administrators. Please contact your HR department.'
+      });
+    }
+    
+    // Validate store IDs for suppliers
+    if (role === 'supplier') {
+      if (!storeIds || !Array.isArray(storeIds) || storeIds.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'At least one store selection is required for suppliers'
+        });
+      }
+      
+      // Verify all stores exist
+      const Store = require('../models/Store');
+      const stores = await Store.find({ _id: { $in: storeIds }, isActive: true });
+      if (stores.length !== storeIds.length) {
+        return res.status(400).json({
+          success: false,
+          message: 'One or more selected stores are not valid'
+        });
+      }
+    }
+    
+    // Create new user (only customers and suppliers can self-register)
     const newUser = new User({
       googleId,
       email,
@@ -355,10 +514,41 @@ const googleVerify = async (req, res) => {
       avatar,
       authProvider: 'google',
       role: role || 'customer', // Use provided role or default to customer
+      storeIds: role === 'supplier' ? storeIds : undefined,
       isActive: true
     });
     
     await newUser.save();
+
+    // If user is a supplier, create a supplier profile
+    if (role === 'supplier') {
+      const Supplier = require('../models/Supplier');
+      
+      // Create basic supplier profile
+      const supplierProfile = new Supplier({
+        userId: newUser._id,
+        assignedStores: storeIds,
+        companyName: `${firstName} ${lastName}'s Company`, // Default company name
+        contactPerson: {
+          name: `${firstName} ${lastName}`,
+          email: email,
+          phone: '',
+          title: 'Owner'
+        },
+        companyInfo: {
+          industry: 'General',
+          establishedYear: new Date().getFullYear()
+        },
+        address: {
+          country: 'USA'
+        },
+        categories: ['Other'], // Default category
+        isActive: true,
+        isApproved: false // Requires approval
+      });
+
+      await supplierProfile.save();
+    }
 
     const token = generateToken(newUser._id);
 
@@ -392,6 +582,7 @@ const googleVerify = async (req, res) => {
 module.exports = {
   register,
   login,
+  adminLogin,
   logout,
   verifyToken,
   getProfile,
