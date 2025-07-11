@@ -1,0 +1,32 @@
+{
+  "name": "walmart-digital-revolution",
+  "version": "1.0.0",
+  "description": "Walmart Digital Revolution - Phase 1: Authentication System",
+  "main": "index.js",
+  "scripts": {
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "server": "cd backend && npm run dev",
+    "client": "cd frontend && npm start",
+    "install-deps": "npm install && cd backend && npm install && cd ../frontend && npm install",
+    "build": "cd frontend && npm run build",
+    "start": "cd backend && npm start"
+  },
+  "keywords": [
+    "walmart",
+    "retail",
+    "digital",
+    "revolution"
+  ],
+  "author": "Walmart Digital Team",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "dependencies": {
+    "axios": "^1.10.0",
+    "date-fns": "^4.1.0",
+    "react-router-dom": "^7.6.3",
+    "recharts": "^3.1.0",
+    "socket.io-client": "^4.8.1"
+  }
+}
