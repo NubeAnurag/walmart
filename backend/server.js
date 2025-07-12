@@ -23,6 +23,7 @@ const reportsRoutes = require('./routes/reports');
 const customerInsightsRoutes = require('./routes/customerInsights');
 const storeRoutes = require('./routes/stores');
 const adminRoutes = require('./routes/admin');
+const managerOrderRoutes = require('./routes/managerOrders');
 
 const app = express();
 const server = http.createServer(app);
@@ -116,6 +117,7 @@ app.use('/api/reports', reportsRoutes);
 app.use('/api/customer-insights', customerInsightsRoutes);
 app.use('/api/stores', storeRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/manager-orders', managerOrderRoutes);
 
 // Test database connection endpoint
 app.get('/api/test-db', async (req, res) => {

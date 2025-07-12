@@ -91,7 +91,7 @@ const register = async (req, res) => {
         },
         categories: ['Other'], // Default category
         isActive: true,
-        isApproved: false // Requires approval
+        isApproved: true // Auto-approve for development - change to false in production
       });
 
       await supplierProfile.save();

@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const Store = require('../models/Store');
+const Supplier = require('../models/Supplier'); // Added Supplier model
 const { generateEmployeeId, generateSecurePassword } = require('../utils/employeeIdGenerator');
 
 // Create new employee (manager or staff)
@@ -446,7 +447,104 @@ const getDashboardStats = async (req, res) => {
   }
 };
 
+// Get all suppliers
+const getAllSuppliers = async (req, res) => {
+  try {
+    const suppliers = await Supplier.find({})
+      .populate('userId', 'firstName lastName email')
+      .populate('assignedStores', 'name storeCode')
+      .sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      suppliers,
+      count: suppliers.length
+    });
+  } catch (error) {
+    console.error('Get all suppliers error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching suppliers'
+    });
+  }
+};
+
+// Approve a supplier
+const approveSupplier = async (req, res) => {
+  try {
+    const { supplierId } = req.params;
+
+    const supplier = await Supplier.findByIdAndUpdate(
+      supplierId,
+      { 
+        isApproved: true,
+        approvedBy: req.user._id,
+        approvedDate: new Date()
+      },
+      { new: true }
+    ).populate('userId', 'firstName lastName email')
+     .populate('assignedStores', 'name storeCode');
+
+    if (!supplier) {
+      return res.status(404).json({
+        success: false,
+        message: 'Supplier not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Supplier approved successfully',
+      supplier
+    });
+  } catch (error) {
+    console.error('Approve supplier error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error approving supplier'
+    });
+  }
+};
+
+// Update supplier status (active/inactive)
+const updateSupplierStatus = async (req, res) => {
+  try {
+    const { supplierId } = req.params;
+    const { isActive } = req.body;
+
+    const supplier = await Supplier.findByIdAndUpdate(
+      supplierId,
+      { isActive },
+      { new: true }
+    ).populate('userId', 'firstName lastName email')
+     .populate('assignedStores', 'name storeCode');
+
+    if (!supplier) {
+      return res.status(404).json({
+        success: false,
+        message: 'Supplier not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: `Supplier ${isActive ? 'activated' : 'deactivated'} successfully`,
+      supplier
+    });
+  } catch (error) {
+    console.error('Update supplier status error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error updating supplier status'
+    });
+  }
+};
+
 module.exports = {
+  // Dashboard
+  getDashboardStats,
+  
+  // Employee Management
   createEmployee,
   getEmployees,
   getEmployeesByStore,
@@ -454,5 +552,9 @@ module.exports = {
   updateEmployee,
   deleteEmployee,
   resetEmployeePassword,
-  getDashboardStats
+  
+  // Supplier Management
+  getAllSuppliers,
+  approveSupplier,
+  updateSupplierStatus
 }; 

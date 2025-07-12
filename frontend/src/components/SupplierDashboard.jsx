@@ -16,9 +16,11 @@ import {
   CheckCircle,
   XCircle,
   Upload,
-  Image as ImageIcon
+  Image as ImageIcon,
+  FileText
 } from 'lucide-react';
 import { supplierAPI } from '../services/api';
+import SupplierOrders from './SupplierOrders';
 
 const SupplierDashboard = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -470,7 +472,8 @@ const SupplierDashboard = () => {
             {[
               { id: 'dashboard', name: 'Dashboard', icon: TrendingUp },
               { id: 'products', name: 'Product Catalog', icon: Package },
-              { id: 'orders', name: 'Order Management', icon: ShoppingCart }
+              { id: 'orders', name: 'Order Management', icon: ShoppingCart },
+              { id: 'manager-orders', name: 'Manager Orders', icon: FileText }
             ].map((tab) => {
               const Icon = tab.icon;
               return (
@@ -787,6 +790,10 @@ const SupplierDashboard = () => {
               </div>
             </div>
           </div>
+        )}
+
+        {activeTab === 'manager-orders' && (
+          <SupplierOrders />
         )}
 
         {activeTab === 'orders' && (

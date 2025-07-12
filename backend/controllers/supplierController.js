@@ -1226,28 +1226,35 @@ const getSuppliersByStore = async (req, res) => {
       assignedStores: storeId,
       isActive: true,
       isApproved: true
-    }).populate('assignedStores', 'name storeCode').populate('userId', 'firstName lastName email');
+    })
+    .populate('assignedStores', 'name storeCode')
+    .populate('userId', 'firstName lastName email')
+    .lean(); // Use lean() for better performance and plain objects
 
     console.log(`📊 Found ${suppliers.length} suppliers for store ${storeId}`);
-    console.log('📊 Full suppliers array:', JSON.stringify(suppliers, null, 2).substring(0, 200) + '...');
+    
+    // Log first supplier details for debugging
+    if (suppliers.length > 0) {
+      console.log('📊 First supplier details:', {
+        _id: suppliers[0]._id,
+        companyName: suppliers[0].companyName,
+        contactPerson: suppliers[0].contactPerson,
+        isActive: suppliers[0].isActive,
+        isApproved: suppliers[0].isApproved,
+        categories: suppliers[0].categories
+      });
+    }
     
     suppliers.forEach(supplier => {
       console.log(`  - ${supplier.companyName} (Active: ${supplier.isActive}, Approved: ${supplier.isApproved})`);
     });
 
-    // Return suppliers in a consistent format - at both top level and in data object
+    // Return suppliers in a consistent format
     const responseData = {
       success: true,
-      suppliers: suppliers, // Direct access at top level
-      data: {
-        suppliers: suppliers, // Also include in data for backward compatibility
-        debug: {
-          storeId,
-          userId,
-          role: req.user.role,
-          totalSuppliers: suppliers.length
-        }
-      }
+      suppliers: suppliers,
+      count: suppliers.length,
+      storeId: storeId
     };
 
     console.log('📤 Sending response with suppliers:', responseData.suppliers.length);
@@ -1346,31 +1353,54 @@ const debugStoreData = async (req, res) => {
 const getSupplierProducts = async (req, res) => {
   try {
     const { supplierId } = req.params;
-    
+
     // Validate supplierId
-    if (!supplierId) {
-      return res.status(400).json({ message: 'Supplier ID is required' });
+    if (!supplierId || supplierId === 'undefined') {
+      return res.status(400).json({
+        success: false,
+        message: 'Valid Supplier ID is required' 
+      });
     }
+
+    console.log('🔍 Getting products for supplier:', supplierId);
 
     // Find supplier and their products
     const supplier = await Supplier.findById(supplierId);
     if (!supplier) {
-      return res.status(404).json({ message: 'Supplier not found' });
+      return res.status(404).json({
+        success: false,
+        message: 'Supplier not found' 
+      });
     }
 
     // Get all products associated with this supplier
-    const products = await Product.find({ supplier: supplierId })
-      .select('name description price stockQuantity image category')
+    // Note: Check if the field is 'supplier' or 'supplierId' in the Product model
+    const products = await Product.find({ 
+      supplierId: supplierId,  // Try supplierId field
+      isActive: true
+    })
+      .select('name description price stock image category brand')
       .sort({ createdAt: -1 });
+    
+    console.log(`📊 Found ${products.length} products for supplier ${supplier.companyName}`);
 
     res.json({
       success: true,
-      products,
+        products,
+      supplier: {
+        _id: supplier._id,
+        companyName: supplier.companyName,
+        contactPerson: supplier.contactPerson
+      },
       message: 'Products retrieved successfully'
     });
   } catch (error) {
     console.error('Get supplier products error:', error);
-    res.status(500).json({ message: 'Error fetching supplier products', error: error.message });
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching supplier products',
+      error: error.message 
+    });
   }
 };
 

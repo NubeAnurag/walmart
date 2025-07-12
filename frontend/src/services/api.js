@@ -158,6 +158,22 @@ export const supplierAPI = {
     const response = await api.put(`/supplier/orders/${orderId}/delivery-time`, { estimatedDeliveryTime });
     return response.data;
   },
+
+  // Manager Orders (for supplier dashboard)
+  getManagerOrders: async (params = {}) => {
+    const response = await api.get('/manager-orders/supplier/orders', { params });
+    return response.data;
+  },
+
+  updateManagerOrderStatus: async (orderId, status, notes = '') => {
+    const response = await api.patch(`/manager-orders/orders/${orderId}/status`, { status, notes });
+    return response.data;
+  },
+
+  getManagerOrderDetails: async (orderId) => {
+    const response = await api.get(`/manager-orders/orders/${orderId}`);
+    return response.data;
+  },
 };
 
 // Manager API functions
@@ -224,6 +240,27 @@ export const managerAPI = {
   // Orders
   placeOrder: async (orderData) => {
     const response = await api.post('/suppliers/orders', orderData);
+    return response.data;
+  },
+
+  // Manager Orders
+  getCatalogProducts: async (params = {}) => {
+    const response = await api.get('/manager-orders/products', { params });
+    return response.data;
+  },
+
+  createOrder: async (orderData) => {
+    const response = await api.post('/manager-orders/orders', orderData);
+    return response.data;
+  },
+
+  getOrders: async (params = {}) => {
+    const response = await api.get('/manager-orders/orders', { params });
+    return response.data;
+  },
+
+  getOrderDetails: async (orderId) => {
+    const response = await api.get(`/manager-orders/orders/${orderId}`);
     return response.data;
   },
 };

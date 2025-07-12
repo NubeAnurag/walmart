@@ -28,6 +28,8 @@ import { managerAPI } from '../services/api';
 import { format } from 'date-fns';
 import { supplierAPI } from '../services/api';
 
+import ManagerOrders from './ManagerOrders';
+
 const ManagerDashboard = () => {
   const { user, logout } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
@@ -51,6 +53,20 @@ const ManagerDashboard = () => {
   useEffect(() => {
     fetchDashboardData();
   }, []);
+
+  // Refresh suppliers when suppliers tab is selected
+  useEffect(() => {
+    if (activeTab === 'suppliers') {
+      managerAPI.getSuppliersByStore().then(response => {
+        console.log('🔄 Refreshing suppliers for tab change:', response);
+        if (response?.suppliers) {
+          setSuppliers(response.suppliers);
+        }
+      }).catch(error => {
+        console.error('Error refreshing suppliers:', error);
+      });
+    }
+  }, [activeTab]);
 
   const fetchDashboardData = async () => {
     try {
@@ -205,6 +221,8 @@ const ManagerDashboard = () => {
     { id: 'staff', label: 'Staff', icon: Users },
     { id: 'inventory', label: 'Inventory', icon: Package },
     { id: 'suppliers', label: 'Suppliers', icon: Truck },
+
+    { id: 'orders', label: 'My Orders', icon: FileText },
     { id: 'reports', label: 'Reports', icon: FileText },
     { id: 'analytics', label: 'Analytics', icon: TrendingUp }
   ];
@@ -330,7 +348,9 @@ const ManagerDashboard = () => {
           setSuppliers={setSuppliers} 
           fetchSupplierProducts={fetchSupplierProducts}
           selectedSupplier={selectedSupplier}
+          setSelectedSupplier={setSelectedSupplier}
           supplierProducts={supplierProducts}
+          setSupplierProducts={setSupplierProducts}
           handleAddToOrder={handleAddToOrder}
           orderItems={orderItems}
           setOrderItems={setOrderItems}
@@ -338,6 +358,8 @@ const ManagerDashboard = () => {
           showOrderModal={showOrderModal}
           handlePlaceOrder={handlePlaceOrder}
         />}
+
+        {activeTab === 'orders' && <ManagerOrders />}
         {activeTab === 'reports' && <ReportsTab reports={reports} setReports={setReports} />}
         {activeTab === 'analytics' && <AnalyticsTab data={dashboardData} />}
       </div>
@@ -690,7 +712,9 @@ const SuppliersTab = ({
   setSuppliers, 
   fetchSupplierProducts, 
   selectedSupplier, 
+  setSelectedSupplier, 
   supplierProducts, 
+  setSupplierProducts, 
   handleAddToOrder, 
   orderItems, 
   setOrderItems, 
@@ -708,6 +732,13 @@ const SuppliersTab = ({
   const [view, setView] = useState('suppliers'); // 'suppliers' or 'products'
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [productFilters, setProductFilters] = useState({
+    search: '',
+    category: 'all',
+    minPrice: '',
+    maxPrice: '',
+    inStock: 'all'
+  });
 
   // Ensure suppliers is treated as an array even if it's not
   const safeSuppliers = Array.isArray(suppliers) ? suppliers : [];
@@ -722,6 +753,11 @@ const SuppliersTab = ({
 
   console.log('Debug: Suppliers count:', safeSuppliers.length);
   console.log('Debug: Filtered suppliers count:', filteredSuppliers.length);
+  
+  // Add more detailed debugging
+  if (safeSuppliers.length > 0) {
+    console.log('Debug: First supplier structure:', JSON.stringify(safeSuppliers[0], null, 2));
+  }
 
   // Refresh suppliers data
   const refreshSuppliers = async () => {
@@ -779,9 +815,24 @@ const SuppliersTab = ({
     }
   };
 
-  const handleViewProducts = (supplier) => {
-    fetchSupplierProducts(supplier._id);
-    setView('products');
+  const handleViewProducts = async (supplier) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      console.log('Viewing products for supplier:', supplier._id, supplier.companyName);
+      
+      setSelectedSupplier(supplier);
+      const response = await supplierAPI.getSupplierProducts(supplier._id);
+      
+      console.log('Products response:', response);
+      setSupplierProducts(response.products || []);
+      setView('products'); // Change view after successfully loading products
+    } catch (err) {
+      setError('Failed to fetch supplier products');
+      console.error('Error fetching supplier products:', err);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleBackToSuppliers = () => {
@@ -806,6 +857,82 @@ const SuppliersTab = ({
 
   const getTotalOrderValue = () => {
     return orderItems.reduce((total, item) => total + item.totalPrice, 0);
+  };
+
+  // Filter products based on search and filter criteria
+  const getFilteredProducts = () => {
+    if (!supplierProducts || supplierProducts.length === 0) return [];
+    
+    return supplierProducts.filter(product => {
+      // Search filter
+      if (productFilters.search && !product.name.toLowerCase().includes(productFilters.search.toLowerCase()) &&
+          !product.description.toLowerCase().includes(productFilters.search.toLowerCase()) &&
+          !product.brand.toLowerCase().includes(productFilters.search.toLowerCase())) {
+        return false;
+      }
+      
+      // Category filter
+      if (productFilters.category !== 'all' && product.category !== productFilters.category) {
+        return false;
+      }
+      
+      // Price filters
+      if (productFilters.minPrice && product.price < parseFloat(productFilters.minPrice)) {
+        return false;
+      }
+      if (productFilters.maxPrice && product.price > parseFloat(productFilters.maxPrice)) {
+        return false;
+      }
+      
+      // Stock filter
+      if (productFilters.inStock === 'inStock' && product.stock <= 0) {
+        return false;
+      }
+      if (productFilters.inStock === 'outOfStock' && product.stock > 0) {
+        return false;
+      }
+      
+      return true;
+    });
+  };
+
+  // Get unique categories from products
+  const getProductCategories = () => {
+    if (!supplierProducts || supplierProducts.length === 0) return [];
+    const categories = [...new Set(supplierProducts.map(product => product.category))];
+    return categories.filter(category => category); // Remove empty categories
+  };
+
+  // Export products to CSV
+  const exportProductsToCSV = () => {
+    if (!supplierProducts || supplierProducts.length === 0) {
+      alert('No products to export');
+      return;
+    }
+
+    const headers = ['Name', 'Description', 'Category', 'Brand', 'Price', 'Stock', 'SKU'];
+    const csvContent = [
+      headers.join(','),
+      ...getFilteredProducts().map(product => [
+        `"${product.name}"`,
+        `"${product.description || ''}"`,
+        `"${product.category || ''}"`,
+        `"${product.brand || ''}"`,
+        product.price,
+        product.stock,
+        `"${product.sku || ''}"`
+      ].join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `${selectedSupplier?.companyName}_products.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   if (view === 'products') {
@@ -835,11 +962,81 @@ const SuppliersTab = ({
               Review Order ({orderItems.length})
             </button>
           )}
+          <button 
+            onClick={exportProductsToCSV}
+            className="btn btn-secondary"
+            disabled={supplierProducts.length === 0}
+          >
+            <Download className="w-4 h-4 mr-2" />
+            Export Products
+          </button>
+        </div>
+
+        {/* Search and Filter Section */}
+        <div className="bg-white p-4 rounded-lg shadow">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            <input
+              type="text"
+              placeholder="Search products..."
+              value={productFilters.search}
+              onChange={(e) => setProductFilters({ ...productFilters, search: e.target.value })}
+              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            
+            <select
+              value={productFilters.category}
+              onChange={(e) => setProductFilters({ ...productFilters, category: e.target.value })}
+              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">All Categories</option>
+              {getProductCategories().map(category => (
+                <option key={category} value={category}>{category}</option>
+              ))}
+            </select>
+
+            <input
+              type="number"
+              placeholder="Min Price"
+              value={productFilters.minPrice}
+              onChange={(e) => setProductFilters({ ...productFilters, minPrice: e.target.value })}
+              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+
+            <input
+              type="number"
+              placeholder="Max Price"
+              value={productFilters.maxPrice}
+              onChange={(e) => setProductFilters({ ...productFilters, maxPrice: e.target.value })}
+              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+
+            <select
+              value={productFilters.inStock}
+              onChange={(e) => setProductFilters({ ...productFilters, inStock: e.target.value })}
+              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">All Stock</option>
+              <option value="inStock">In Stock</option>
+              <option value="outOfStock">Out of Stock</option>
+            </select>
+          </div>
+          
+          <div className="mt-3 flex justify-between items-center">
+            <button
+              onClick={() => setProductFilters({ search: '', category: 'all', minPrice: '', maxPrice: '', inStock: 'all' })}
+              className="text-sm text-gray-600 hover:text-gray-800"
+            >
+              Clear Filters
+            </button>
+            <span className="text-sm text-gray-500">
+              {getFilteredProducts().length} of {supplierProducts.length} products
+            </span>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {supplierProducts.length > 0 ? (
-            supplierProducts.map((product) => (
+          {getFilteredProducts().length > 0 ? (
+            getFilteredProducts().map((product) => (
               <div key={product._id} className="bg-white rounded-lg shadow p-6">
                 {product.image && (
                   <img 
@@ -877,8 +1074,18 @@ const SuppliersTab = ({
           ) : (
             <div className="col-span-full text-center py-12">
               <Package className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-500">No products available</p>
-              <p className="text-sm text-gray-400">This supplier has no products in your store</p>
+              <p className="text-gray-500">
+                {supplierProducts.length === 0 
+                  ? 'No products available' 
+                  : 'No products match your filters'
+                }
+              </p>
+              <p className="text-sm text-gray-400">
+                {supplierProducts.length === 0 
+                  ? 'This supplier has no products in your store' 
+                  : 'Try adjusting your search criteria'
+                }
+              </p>
             </div>
           )}
         </div>
@@ -980,9 +1187,10 @@ const SuppliersTab = ({
           <button 
             onClick={refreshSuppliers} 
             className="btn btn-secondary flex items-center"
+            disabled={isLoading}
           >
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh Suppliers
+            <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+            {isLoading ? 'Refreshing...' : 'Refresh Suppliers'}
           </button>
           <div className="text-sm text-gray-600">
             {safeSuppliers.length || 0} suppliers assigned to your store
@@ -1017,6 +1225,18 @@ const SuppliersTab = ({
           <div className="flex items-center">
             <AlertTriangle className="w-5 h-5 mr-2" />
             <p>{error}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Loading overlay */}
+      {isLoading && (
+        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-40">
+          <div className="bg-white p-6 rounded-lg shadow-xl">
+            <div className="flex items-center space-x-3">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-walmart-blue"></div>
+              <p className="text-lg">Loading suppliers...</p>
+            </div>
           </div>
         </div>
       )}
