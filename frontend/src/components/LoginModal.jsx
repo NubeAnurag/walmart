@@ -8,6 +8,7 @@ const LoginModal = ({ isOpen, onClose, selectedRole, onSwitchToRegister }) => {
   const [formData, setFormData] = useState({
     email: '',
     password: '',
+    staffType: '',
   });
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState({});
@@ -43,6 +44,10 @@ const LoginModal = ({ isOpen, onClose, selectedRole, onSwitchToRegister }) => {
     if (!formData.password) {
       newErrors.password = 'Password is required';
     }
+
+    if (selectedRole === 'staff' && !formData.staffType) {
+      newErrors.staffType = 'Staff type is required';
+    }
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -77,7 +82,7 @@ const LoginModal = ({ isOpen, onClose, selectedRole, onSwitchToRegister }) => {
 
   const handleClose = () => {
     if (!isSubmitting) {
-      setFormData({ email: '', password: '' });
+      setFormData({ email: '', password: '', staffType: '' });
       setErrors({});
       onClose();
     }
@@ -169,6 +174,29 @@ const LoginModal = ({ isOpen, onClose, selectedRole, onSwitchToRegister }) => {
               <p className="text-red-500 text-sm mt-1">{errors.password}</p>
             )}
           </div>
+
+          {/* Staff Type Field - Only show for staff role */}
+          {selectedRole === 'staff' && (
+            <div>
+              <label className="label text-gray-700 mb-2 block">
+                Staff Type
+              </label>
+              <select
+                name="staffType"
+                value={formData.staffType}
+                onChange={handleChange}
+                className={`input ${errors.staffType ? 'input-error' : ''}`}
+                disabled={isSubmitting}
+              >
+                <option value="">Select Staff Type</option>
+                <option value="cashier">Cashier</option>
+                <option value="inventory">Inventory</option>
+              </select>
+              {errors.staffType && (
+                <p className="text-red-500 text-sm mt-1">{errors.staffType}</p>
+              )}
+            </div>
+          )}
 
           {/* Forgot Password */}
           <div className="text-right">

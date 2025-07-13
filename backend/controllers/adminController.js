@@ -13,7 +13,8 @@ const createEmployee = async (req, res) => {
       role, 
       storeId, 
       phone,
-      password: customPassword 
+      password: customPassword,
+      staffType
     } = req.body;
 
     // Validate required fields
@@ -21,6 +22,21 @@ const createEmployee = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: 'Email, first name, last name, role, and store are required'
+      });
+    }
+
+    // Validate staff type for staff role
+    if (role === 'staff' && !staffType) {
+      return res.status(400).json({
+        success: false,
+        message: 'Staff type is required for staff role'
+      });
+    }
+
+    if (role === 'staff' && !['cashier', 'inventory'].includes(staffType)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Staff type must be either cashier or inventory'
       });
     }
 
@@ -50,8 +66,24 @@ const createEmployee = async (req, res) => {
       });
     }
 
+    // Check if a manager already exists for this store
+    if (role === 'manager') {
+      const existingManager = await User.findOne({
+        storeId: storeId,
+        role: 'manager',
+        isActive: true
+      });
+      
+      if (existingManager) {
+        return res.status(400).json({
+          success: false,
+          message: `A manager already exists for this store (${existingManager.firstName} ${existingManager.lastName}). Each store can have only one manager.`
+        });
+      }
+    }
+
     // Generate employee ID
-    const employeeId = await generateEmployeeId(storeId, role);
+    const employeeId = await generateEmployeeId(storeId, role, staffType);
 
     // Generate or use provided password
     const password = customPassword || generateSecurePassword();
@@ -67,7 +99,8 @@ const createEmployee = async (req, res) => {
       employeeId,
       phone,
       authProvider: 'local',
-      isActive: true
+      isActive: true,
+      staffType: role === 'staff' ? staffType : undefined
     });
 
     await employee.save();
@@ -241,7 +274,7 @@ const getEmployee = async (req, res) => {
 const updateEmployee = async (req, res) => {
   try {
     const { id } = req.params;
-    const { firstName, lastName, phone, email, storeId, isActive } = req.body;
+    const { firstName, lastName, phone, email, storeId, isActive, staffType } = req.body;
 
     const employee = await User.findById(id);
     
@@ -252,12 +285,23 @@ const updateEmployee = async (req, res) => {
       });
     }
 
+    // Validate staff type if provided
+    if (staffType && employee.role === 'staff') {
+      if (!['cashier', 'inventory'].includes(staffType)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Staff type must be either cashier or inventory'
+        });
+      }
+    }
+
     // Update allowed fields
     if (firstName) employee.firstName = firstName;
     if (lastName) employee.lastName = lastName;
     if (phone) employee.phone = phone;
     if (email) employee.email = email;
     if (typeof isActive === 'boolean') employee.isActive = isActive;
+    if (staffType && employee.role === 'staff') employee.staffType = staffType;
     
     // If store is being changed, regenerate employee ID
     if (storeId && storeId !== employee.storeId.toString()) {
@@ -269,8 +313,25 @@ const updateEmployee = async (req, res) => {
         });
       }
       
+      // Check if a manager already exists for the new store
+      if (employee.role === 'manager') {
+        const existingManager = await User.findOne({
+          storeId: storeId,
+          role: 'manager',
+          isActive: true,
+          _id: { $ne: employee._id } // Exclude current employee
+        });
+        
+        if (existingManager) {
+          return res.status(400).json({
+            success: false,
+            message: `A manager already exists for this store (${existingManager.firstName} ${existingManager.lastName}). Each store can have only one manager.`
+          });
+        }
+      }
+      
       employee.storeId = storeId;
-      employee.employeeId = await generateEmployeeId(storeId, employee.role);
+      employee.employeeId = await generateEmployeeId(storeId, employee.role, employee.staffType);
     }
 
     await employee.save();

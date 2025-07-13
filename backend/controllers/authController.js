@@ -30,7 +30,11 @@ const register = async (req, res) => {
     if (existingUser) {
       return res.status(400).json({
         success: false,
-        message: 'User already exists with this email address'
+        message: 'User already exists with this email address',
+        errors: [{
+          field: 'email',
+          message: 'An account with this email already exists'
+        }]
       });
     }
 
@@ -122,18 +126,26 @@ const register = async (req, res) => {
     
     // Handle specific MongoDB errors
     if (error.code === 11000) { // Duplicate key error
+      const field = Object.keys(error.keyValue)[0];
       return res.status(400).json({
         success: false,
-        message: 'User already exists with this email address'
+        message: 'User already exists with this email address',
+        errors: [{
+          field: field,
+          message: field === 'email' ? 'An account with this email already exists' : 'This value already exists'
+        }]
       });
     }
 
     if (error.name === 'ValidationError') {
-      const messages = Object.values(error.errors).map(err => err.message);
+      const errors = Object.values(error.errors).map(err => ({
+        field: err.path,
+        message: err.message
+      }));
       return res.status(400).json({
         success: false,
         message: 'Validation error',
-        errors: messages
+        errors: errors
       });
     }
 
@@ -147,12 +159,13 @@ const register = async (req, res) => {
 // Login user
 const login = async (req, res) => {
   try {
-    const { email, password, role } = req.body;
+    const { email, password, role, staffType } = req.body;
 
     // Find user by email (includes password for verification)
     const user = await User.findOne({ email: email.toLowerCase(), isActive: true })
       .populate('storeId')
       .populate('storeIds');
+    
     if (!user) {
       return res.status(401).json({
         success: false,
@@ -162,6 +175,7 @@ const login = async (req, res) => {
 
     // Verify password
     const isPasswordValid = await user.verifyPassword(password);
+    
     if (!isPasswordValid) {
       return res.status(401).json({
         success: false,
@@ -175,6 +189,23 @@ const login = async (req, res) => {
         success: false,
         message: `Access denied. You are registered as a ${user.role}, not as a ${role}. Please use the correct role to login.`
       });
+    }
+
+    // Validate staff type for staff users
+    if (user.role === 'staff') {
+      if (!staffType) {
+        return res.status(400).json({
+          success: false,
+          message: 'Staff type is required for staff login'
+        });
+      }
+
+      if (user.staffType !== staffType) {
+        return res.status(403).json({
+          success: false,
+          message: `Access denied. You are registered as a ${user.staffType} staff, not as a ${staffType} staff. Please select the correct staff type.`
+        });
+      }
     }
 
     // Generate token

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { X, Eye, EyeOff, Loader2, Mail, Lock, User, Phone, Building2 } from 'lucide-react';
+import { X, Eye, EyeOff, Loader2, Mail, Lock, User, Phone, CheckCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { storeAPI } from '../services/api';
+import { toast } from 'react-hot-toast';
 
 const RegisterModal = ({ isOpen, onClose, selectedRole, onSwitchToLogin }) => {
   const [formData, setFormData] = useState({
@@ -19,11 +20,22 @@ const RegisterModal = ({ isOpen, onClose, selectedRole, onSwitchToLogin }) => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
   const [stores, setStores] = useState([]);
   const [loadingStores, setLoadingStores] = useState(false);
   
   const { register, isLoading } = useAuth();
   const navigate = useNavigate();
+
+  // Update role when selectedRole prop changes
+  useEffect(() => {
+    if (selectedRole) {
+      setFormData(prev => ({
+        ...prev,
+        role: selectedRole
+      }));
+    }
+  }, [selectedRole]);
 
   // Fetch stores when component mounts
   useEffect(() => {
@@ -97,8 +109,10 @@ const RegisterModal = ({ isOpen, onClose, selectedRole, onSwitchToLogin }) => {
       newErrors.lastName = 'Last name must be at least 2 characters long';
     }
     
-    // Phone validation (optional but if provided, must be valid)
-    if (formData.phone && !/^[\+]?[1-9][\d]{0,15}$/.test(formData.phone)) {
+    // Phone validation (required for suppliers, optional for customers)
+    if (formData.role === 'supplier' && !formData.phone) {
+      newErrors.phone = 'Phone number is required for suppliers';
+    } else if (formData.phone && !/^[+]?[\d\s\-()]{10,15}$/.test(formData.phone.replace(/\s/g, ''))) {
       newErrors.phone = 'Please enter a valid phone number';
     }
     
@@ -123,9 +137,11 @@ const RegisterModal = ({ isOpen, onClose, selectedRole, onSwitchToLogin }) => {
     
     console.log('🚀 Registration form submitted');
     console.log('📝 Form data:', formData);
+    console.log('📡 API Base URL:', process.env.REACT_APP_API_URL || 'http://localhost:5001/api');
     
     if (!validateForm()) {
       console.log('❌ Form validation failed');
+      console.log('❌ Validation errors:', errors);
       return;
     }
     
@@ -147,26 +163,67 @@ const RegisterModal = ({ isOpen, onClose, selectedRole, onSwitchToLogin }) => {
       
       if (result.success) {
         console.log('✅ Registration successful, closing modal and redirecting');
+        // Show success message
+        toast.success(`Welcome ${result.user.firstName}! Account created successfully.`);
+        setIsRedirecting(true);
         onClose();
-        // Redirect based on user role
-        navigate(`/dashboard/${result.user.role}`);
+        // Small delay to let user see the success message
+        setTimeout(() => {
+          navigate(`/dashboard/${result.user.role}`);
+        }, 1000);
       } else {
         console.log('❌ Registration failed:', result.error);
+        console.log('❌ Registration errors:', result.errors);
         // Show error message to user
         if (result.error) {
-          setErrors({ general: result.error });
+          // Handle specific error types
+          if (result.error.includes('User already exists') || result.error.includes('duplicate key')) {
+            setErrors({ 
+              email: 'An account with this email already exists. Please try logging in instead.',
+              general: 'Registration failed - email already in use.'
+            });
+          } else if (result.errors && Array.isArray(result.errors)) {
+            // Handle field-specific validation errors
+            const fieldErrors = {};
+            result.errors.forEach(error => {
+              if (error.field) {
+                fieldErrors[error.field] = error.message;
+              }
+            });
+            setErrors(fieldErrors);
+          } else {
+            setErrors({ general: result.error });
+          }
         }
       }
     } catch (error) {
       console.error('💥 Registration error:', error);
-      setErrors({ general: 'An unexpected error occurred. Please try again.' });
+      console.error('💥 Error details:', error.response?.data);
+      console.error('💥 Error status:', error.response?.status);
+      console.error('💥 Error message:', error.message);
+      
+      // Show more specific error messages
+      let errorMessage = 'An unexpected error occurred. Please try again.';
+      
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message.includes('Network Error')) {
+        errorMessage = 'Cannot connect to server. Please check if the backend is running.';
+      } else if (error.code === 'ECONNREFUSED') {
+        errorMessage = 'Connection refused. Backend server may be down.';
+      }
+      
+      setErrors({ general: errorMessage });
+      
+      // Also show a toast for immediate feedback
+      toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleClose = () => {
-    if (!isSubmitting) {
+    if (!isSubmitting && !isRedirecting) {
       setFormData({
         email: '',
         password: '',
@@ -178,6 +235,7 @@ const RegisterModal = ({ isOpen, onClose, selectedRole, onSwitchToLogin }) => {
         storeIds: [],
       });
       setErrors({});
+      setIsRedirecting(false);
       onClose();
     }
   };
@@ -208,7 +266,7 @@ const RegisterModal = ({ isOpen, onClose, selectedRole, onSwitchToLogin }) => {
           </div>
           <button
             onClick={handleClose}
-            disabled={isSubmitting}
+            disabled={isSubmitting || isRedirecting}
             className="p-2 hover:bg-gray-100 rounded-full transition-colors disabled:opacity-50"
           >
             <X className="w-5 h-5 text-gray-500" />
@@ -226,6 +284,22 @@ const RegisterModal = ({ isOpen, onClose, selectedRole, onSwitchToLogin }) => {
                 </div>
                 <div className="ml-3">
                   <p className="text-sm text-red-700">{errors.general}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Success Message */}
+          {isRedirecting && (
+            <div className="bg-green-50 border border-green-200 rounded-md p-4 mb-4">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <CheckCircle className="h-5 w-5 text-green-400" />
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm text-green-700">
+                    Account created successfully! Redirecting to your dashboard...
+                  </p>
                 </div>
               </div>
             </div>
@@ -296,12 +370,30 @@ const RegisterModal = ({ isOpen, onClose, selectedRole, onSwitchToLogin }) => {
             {errors.email && (
               <p className="text-red-500 text-sm mt-1">{errors.email}</p>
             )}
+            {errors.email && errors.email.includes('already exists') && (
+              <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-md">
+                <p className="text-blue-700 text-sm">
+                  <strong>Already have an account?</strong>{' '}
+                  <button
+                    type="button"
+                    onClick={onSwitchToLogin}
+                    className="text-walmart-blue hover:text-walmart-blue/80 font-medium underline"
+                  >
+                    Sign in here
+                  </button>
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Phone Field */}
           <div>
             <label className="label text-gray-700 mb-2 block">
-              Phone Number <span className="text-gray-400">(Optional)</span>
+              Phone Number {formData.role === 'supplier' ? (
+                <span className="text-red-500">*</span>
+              ) : (
+                <span className="text-gray-400">(Optional)</span>
+              )}
             </label>
             <div className="relative">
               <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -469,10 +561,15 @@ const RegisterModal = ({ isOpen, onClose, selectedRole, onSwitchToLogin }) => {
           {/* Submit Button */}
           <button
             type="submit"
-            disabled={isSubmitting || isLoading}
+            disabled={isSubmitting || isLoading || isRedirecting}
             className="btn btn-primary btn-lg w-full"
           >
-            {isSubmitting || isLoading ? (
+            {isRedirecting ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Redirecting to Dashboard...
+              </>
+            ) : isSubmitting || isLoading ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 Creating Account...

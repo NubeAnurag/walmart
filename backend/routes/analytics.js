@@ -5,7 +5,8 @@ const {
   getSalesAnalytics,
   getInventoryAnalytics,
   getPerformanceMetrics,
-  getRealTimeAlerts
+  getRealTimeAlerts,
+  getSupplierPerformanceMetrics
 } = require('../controllers/analyticsController');
 const { verifyToken } = require('../middleware/auth');
 
@@ -45,5 +46,6 @@ router.get('/sales', getSalesAnalytics);
 router.get('/inventory', getInventoryAnalytics);
 router.get('/performance', getPerformanceMetrics);
 router.get('/alerts', getRealTimeAlerts);
+router.get('/supplier-performance', getSupplierPerformanceMetrics);
 
 module.exports = router; 

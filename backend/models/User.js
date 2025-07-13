@@ -37,6 +37,19 @@ const userSchema = new mongoose.Schema({
     enum: ['customer', 'manager', 'staff', 'supplier', 'admin'],
     default: 'customer'
   },
+  staffType: {
+    type: String,
+    enum: ['cashier', 'inventory'],
+    required: function() {
+      return this.role === 'staff';
+    },
+    validate: {
+      validator: function(v) {
+        return this.role !== 'staff' || v; // If role is staff, staffType must be provided
+      },
+      message: 'Staff type is required for staff role'
+    }
+  },
   employeeId: {
     type: String,
     unique: true,
@@ -108,6 +121,18 @@ userSchema.index({ role: 1 });
 userSchema.index({ isActive: 1 });
 userSchema.index({ storeId: 1 });
 userSchema.index({ employeeId: 1 });
+
+// Compound unique index to ensure only one active manager per store
+userSchema.index(
+  { storeId: 1, role: 1, isActive: 1 },
+  { 
+    unique: true,
+    partialFilterExpression: { 
+      role: 'manager', 
+      isActive: true 
+    }
+  }
+);
 
 // Pre-save middleware to hash password
 userSchema.pre('save', async function(next) {

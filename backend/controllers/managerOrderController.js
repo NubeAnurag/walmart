@@ -263,17 +263,23 @@ const getSupplierOrders = async (req, res) => {
 const updateOrderStatus = async (req, res) => {
   try {
     const { orderId } = req.params;
-    const { status, notes } = req.body;
+    const { status, notes, estimatedDeliveryDate } = req.body;
     const supplierId = req.user.id;
 
     console.log('🔄 Updating order status:');
     console.log('Order ID:', orderId);
     console.log('New Status:', status);
     console.log('Supplier ID:', supplierId);
+    console.log('Estimated Delivery Date:', estimatedDeliveryDate);
 
     // Validate status
     if (!['approved', 'rejected'].includes(status)) {
       return res.status(400).json({ message: 'Invalid status. Must be "approved" or "rejected"' });
+    }
+
+    // Validate estimated delivery date for approved orders
+    if (status === 'approved' && !estimatedDeliveryDate) {
+      return res.status(400).json({ message: 'Estimated delivery date is required when approving an order' });
     }
 
     // Find the order
@@ -292,15 +298,48 @@ const updateOrderStatus = async (req, res) => {
       return res.status(400).json({ message: `Order cannot be updated. Current status: ${order.status}` });
     }
 
-    // Update order status
-    await order.updateStatus(status, supplierId, notes);
+    // Update order status and delivery date
+    order.status = status;
+    
+    // Set estimated delivery date if approved
+    if (status === 'approved' && estimatedDeliveryDate) {
+      const deliveryDate = new Date(estimatedDeliveryDate);
+      
+      // Validate delivery date is in the future
+      if (deliveryDate <= new Date()) {
+        return res.status(400).json({ message: 'Estimated delivery date must be in the future' });
+      }
+      
+      order.expectedDeliveryDate = deliveryDate;
+    }
+    
+    // Add supplier notes
+    if (notes) {
+      order.notes.supplier = notes;
+    }
+
+    // Add timeline entry
+    order.timeline.push({
+      status: status,
+      updatedBy: supplierId,
+      notes: notes || `Order ${status}${status === 'approved' ? ` with delivery date ${new Date(estimatedDeliveryDate).toLocaleDateString()}` : ''}`
+    });
+
+    await order.save();
 
     console.log(`✅ Order ${orderId} status updated to ${status}`);
+
+    // Populate order for response
+    const populatedOrder = await ManagerOrder.findById(orderId)
+      .populate('managerId', 'firstName lastName email')
+      .populate('supplierId', 'firstName lastName email companyName')
+      .populate('storeId', 'name storeCode address')
+      .populate('items.productId', 'name image sku category');
 
     res.json({
       success: true,
       message: `Order ${status} successfully`,
-      data: order
+      data: populatedOrder
     });
 
   } catch (error) {
@@ -353,11 +392,204 @@ const getOrderDetails = async (req, res) => {
   }
 };
 
+// Accept delivery (manager accepts received items)
+const acceptDelivery = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { deliveredItems, deliveryDate, deliveryNotes } = req.body;
+    const managerId = req.user.id;
+
+    console.log('📦 Accepting delivery:');
+    console.log('Order ID:', orderId);
+    console.log('Manager ID:', managerId);
+    console.log('Delivered Items:', deliveredItems);
+
+    // Validate required fields
+    if (!deliveredItems || !Array.isArray(deliveredItems) || deliveredItems.length === 0) {
+      return res.status(400).json({ message: 'Delivered items array is required' });
+    }
+
+    // Find the order
+    const order = await ManagerOrder.findById(orderId);
+    if (!order) {
+      return res.status(404).json({ message: 'Order not found' });
+    }
+
+    // Check if manager owns this order
+    if (order.managerId.toString() !== managerId) {
+      return res.status(403).json({ message: 'Not authorized to accept delivery for this order' });
+    }
+
+    // Check if order is approved
+    if (order.status !== 'approved') {
+      return res.status(400).json({ message: `Cannot accept delivery. Order status: ${order.status}` });
+    }
+
+    // Validate delivered items
+    for (const deliveredItem of deliveredItems) {
+      const { productId, deliveredQuantity } = deliveredItem;
+      
+      if (!productId || deliveredQuantity === undefined) {
+        return res.status(400).json({ message: 'Each delivered item must have productId and deliveredQuantity' });
+      }
+
+      // Extract product ID string from productId (handle both string and object)
+      const productIdString = typeof productId === 'string' 
+        ? productId 
+        : productId.id || productId._id || productId.toString();
+
+      // Find the order item
+      const orderItem = order.items.find(item => item.productId.toString() === productIdString);
+      if (!orderItem) {
+        return res.status(400).json({ message: `Product ${productIdString} not found in order` });
+      }
+
+      // Validate delivered quantity
+      if (deliveredQuantity < 0 || deliveredQuantity > orderItem.quantity) {
+        return res.status(400).json({ 
+          message: `Invalid delivered quantity for ${orderItem.productName}. Must be between 0 and ${orderItem.quantity}` 
+        });
+      }
+    }
+
+    // Accept the delivery
+    await order.acceptDelivery({
+      deliveredItems,
+      deliveryDate: deliveryDate ? new Date(deliveryDate) : new Date(),
+      deliveryNotes
+    }, managerId);
+
+    // Update inventory for delivered items
+    const Inventory = require('../models/Inventory');
+    
+    for (const deliveredItem of deliveredItems) {
+      const { productId, deliveredQuantity, deliveryNotes: itemNotes } = deliveredItem;
+      
+      if (deliveredQuantity > 0) {
+        // Extract product ID string
+        const productIdString = typeof productId === 'string' 
+          ? productId 
+          : productId.id || productId._id || productId.toString();
+
+        // Find or create inventory record
+        let inventory = await Inventory.findOne({ 
+          productId: productIdString, 
+          storeId: order.storeId 
+        });
+
+        if (!inventory) {
+          // Create new inventory record
+          inventory = new Inventory({
+            storeId: order.storeId,
+            productId: productIdString,
+            quantity: 0,
+            reorderLevel: 10, // Default reorder level
+            maxStock: 100,    // Default max stock
+            updatedBy: managerId,
+            stockMovements: []
+          });
+        }
+
+        // Add stock movement for delivery
+        const movement = {
+          type: 'in',
+          quantity: deliveredQuantity,
+          reason: 'Delivery received from supplier',
+          reference: order.orderNumber,
+          timestamp: deliveryDate ? new Date(deliveryDate) : new Date(),
+          performedBy: managerId
+        };
+
+        await inventory.addStockMovement(movement);
+        
+        console.log(`📦 Updated inventory for product ${productIdString}: +${deliveredQuantity} items`);
+      }
+    }
+
+    console.log(`✅ Delivery accepted for order ${orderId} and inventory updated`);
+
+    // Populate order for response
+    const populatedOrder = await ManagerOrder.findById(orderId)
+      .populate('managerId', 'firstName lastName email')
+      .populate('supplierId', 'firstName lastName email companyName')
+      .populate('storeId', 'name storeCode address')
+      .populate('items.productId', 'name image sku category')
+      .populate('deliveryAcceptedBy', 'firstName lastName email');
+
+    res.json({
+      success: true,
+      message: 'Delivery accepted successfully and inventory updated',
+      data: populatedOrder
+    });
+
+  } catch (error) {
+    console.error('❌ Error in acceptDelivery:', error);
+    res.status(500).json({ message: 'Error accepting delivery', error: error.message });
+  }
+};
+
+// Delete order (soft delete)
+const deleteOrder = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const userId = req.user.id;
+    const userRole = req.user.role;
+
+    console.log('🗑️ Deleting order:');
+    console.log('Order ID:', orderId);
+    console.log('User ID:', userId);
+    console.log('User Role:', userRole);
+
+    // Find the order
+    const order = await ManagerOrder.findById(orderId);
+    if (!order) {
+      return res.status(404).json({ message: 'Order not found' });
+    }
+
+    // Check authorization - only manager who created the order can delete it
+    if (userRole === 'manager' && order.managerId.toString() !== userId) {
+      return res.status(403).json({ message: 'Not authorized to delete this order' });
+    }
+
+    // Check if order can be deleted (only pending orders can be deleted)
+    if (order.status !== 'pending') {
+      return res.status(400).json({ 
+        message: `Cannot delete order with status: ${order.status}. Only pending orders can be deleted.` 
+      });
+    }
+
+    // Soft delete the order
+    order.isActive = false;
+    order.status = 'cancelled';
+    order.timeline.push({
+      status: 'cancelled',
+      updatedBy: userId,
+      notes: 'Order deleted by manager'
+    });
+
+    await order.save();
+
+    console.log(`✅ Order ${orderId} deleted successfully`);
+
+    res.json({
+      success: true,
+      message: 'Order deleted successfully',
+      data: { orderId, status: 'cancelled' }
+    });
+
+  } catch (error) {
+    console.error('❌ Error in deleteOrder:', error);
+    res.status(500).json({ message: 'Error deleting order', error: error.message });
+  }
+};
+
 module.exports = {
   getSupplierProducts,
   createOrder,
   getManagerOrders,
   getSupplierOrders,
   updateOrderStatus,
-  getOrderDetails
+  getOrderDetails,
+  acceptDelivery,
+  deleteOrder
 }; 

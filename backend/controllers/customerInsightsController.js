@@ -25,7 +25,7 @@ const getCustomerAnalytics = async (req, res) => {
     const customerSalesData = await Sale.aggregate([
       {
         $match: {
-          storeId: mongoose.Types.ObjectId(storeId),
+          storeId: new mongoose.Types.ObjectId(storeId),
           saleDate: { $gte: start, $lte: end },
           status: { $ne: 'cancelled' }
         }
@@ -55,7 +55,7 @@ const getCustomerAnalytics = async (req, res) => {
     const topCustomers = await Sale.aggregate([
       {
         $match: {
-          storeId: mongoose.Types.ObjectId(storeId),
+          storeId: new mongoose.Types.ObjectId(storeId),
           customerId: { $ne: null },
           saleDate: { $gte: start, $lte: end },
           status: { $ne: 'cancelled' }
@@ -88,7 +88,7 @@ const getCustomerAnalytics = async (req, res) => {
     const purchaseFrequency = await Sale.aggregate([
       {
         $match: {
-          storeId: mongoose.Types.ObjectId(storeId),
+          storeId: new mongoose.Types.ObjectId(storeId),
           customerId: { $ne: null },
           saleDate: { $gte: start, $lte: end },
           status: { $ne: 'cancelled' }
@@ -113,7 +113,7 @@ const getCustomerAnalytics = async (req, res) => {
     const customerTypes = await Sale.aggregate([
       {
         $match: {
-          storeId: mongoose.Types.ObjectId(storeId),
+          storeId: new mongoose.Types.ObjectId(storeId),
           saleDate: { $gte: start, $lte: end },
           status: { $ne: 'cancelled' }
         }
@@ -144,7 +144,7 @@ const getCustomerAnalytics = async (req, res) => {
     const dailyCustomerTrends = await Sale.aggregate([
       {
         $match: {
-          storeId: mongoose.Types.ObjectId(storeId),
+          storeId: new mongoose.Types.ObjectId(storeId),
           saleDate: { $gte: start, $lte: end },
           status: { $ne: 'cancelled' }
         }
@@ -232,7 +232,7 @@ const getCustomerSegmentation = async (req, res) => {
     const rfmAnalysis = await Sale.aggregate([
       {
         $match: {
-          storeId: mongoose.Types.ObjectId(storeId),
+          storeId: new mongoose.Types.ObjectId(storeId),
           customerId: { $ne: null },
           status: { $ne: 'cancelled' }
         }
@@ -412,7 +412,7 @@ const getCustomerSegmentation = async (req, res) => {
     const segmentSummary = await Sale.aggregate([
       {
         $match: {
-          storeId: mongoose.Types.ObjectId(storeId),
+          storeId: new mongoose.Types.ObjectId(storeId),
           customerId: { $ne: null },
           status: { $ne: 'cancelled' }
         }
@@ -519,7 +519,7 @@ const getCustomerBehavior = async (req, res) => {
     const timePatterns = await Sale.aggregate([
       {
         $match: {
-          storeId: mongoose.Types.ObjectId(storeId),
+          storeId: new mongoose.Types.ObjectId(storeId),
           saleDate: { $gte: start, $lte: end },
           status: { $ne: 'cancelled' }
         }
@@ -551,7 +551,7 @@ const getCustomerBehavior = async (req, res) => {
     const categoryPreferences = await Sale.aggregate([
       {
         $match: {
-          storeId: mongoose.Types.ObjectId(storeId),
+          storeId: new mongoose.Types.ObjectId(storeId),
           saleDate: { $gte: start, $lte: end },
           status: { $ne: 'cancelled' }
         }
@@ -583,7 +583,7 @@ const getCustomerBehavior = async (req, res) => {
     const paymentPreferences = await Sale.aggregate([
       {
         $match: {
-          storeId: mongoose.Types.ObjectId(storeId),
+          storeId: new mongoose.Types.ObjectId(storeId),
           saleDate: { $gte: start, $lte: end },
           status: { $ne: 'cancelled' }
         }

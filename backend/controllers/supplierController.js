@@ -1348,49 +1348,76 @@ const debugStoreData = async (req, res) => {
 /**
  * Get products for a specific supplier
  * @route GET /api/supplier/:supplierId/products
- * @access Private
+ * @access Private - Both suppliers and managers can access
  */
 const getSupplierProducts = async (req, res) => {
   try {
-    const { supplierId } = req.params;
+    const { id, supplierId } = req.params;
+    // Use either id or supplierId parameter depending on which route was used
+    const supplierIdToUse = id || supplierId;
 
     // Validate supplierId
-    if (!supplierId || supplierId === 'undefined') {
+    if (!supplierIdToUse || supplierIdToUse === 'undefined') {
       return res.status(400).json({
         success: false,
         message: 'Valid Supplier ID is required' 
       });
     }
 
-    console.log('🔍 Getting products for supplier:', supplierId);
+    console.log(`🔍 Getting products for supplier: ${supplierIdToUse} (Role: ${req.user.role})`);
 
-    // Find supplier and their products
-    const supplier = await Supplier.findById(supplierId);
+    // Find supplier profile first
+    const supplier = await Supplier.findById(supplierIdToUse).populate('userId');
     if (!supplier) {
+      console.log(`❌ Supplier not found with ID: ${supplierIdToUse}`);
       return res.status(404).json({
         success: false,
         message: 'Supplier not found' 
       });
     }
 
-    // Get all products associated with this supplier
-    // Note: Check if the field is 'supplier' or 'supplierId' in the Product model
+    // Get the User ID from the supplier profile (this is what products are linked to)
+    const supplierUserId = supplier.userId._id;
+    console.log(`🔗 Supplier details:`);
+    console.log(`   - Company: ${supplier.companyName}`);
+    console.log(`   - Supplier ID: ${supplier._id}`);
+    console.log(`   - User ID: ${supplierUserId}`);
+
+    // Get all products associated with this supplier's user ID
     const products = await Product.find({ 
-      supplierId: supplierId,  // Try supplierId field
+      supplierId: supplierUserId,
       isActive: true
     })
-      .select('name description price stock image category brand')
-      .sort({ createdAt: -1 });
+      .select('name description price stock image category brand sku')
+      .sort({ createdAt: -1 })
+      .lean(); // Use lean for better performance and to allow modifications
     
-    console.log(`📊 Found ${products.length} products for supplier ${supplier.companyName}`);
+    // Transform products to ensure consistent format
+    const transformedProducts = products.map(product => ({
+      ...product,
+      id: product._id.toString(), // Add id field for frontend compatibility
+      _id: product._id.toString(), // Ensure _id is a string
+      // Ensure image has proper structure
+      image: product.image || { url: null, publicId: null }
+    }));
+    
+    console.log(`📊 Found ${transformedProducts.length} products for supplier ${supplier.companyName}`);
+    if (transformedProducts.length > 0) {
+      console.log(`📦 Products:`);
+      transformedProducts.forEach(p => {
+        console.log(`   - ${p.name} (ID: ${p._id}, Price: $${p.price}, Image: ${p.image?.url ? 'Yes' : 'No'})`);
+      });
+    }
 
     res.json({
       success: true,
-        products,
+      products: transformedProducts,
       supplier: {
-        _id: supplier._id,
+        _id: supplier._id.toString(),
+        id: supplier._id.toString(),
         companyName: supplier.companyName,
-        contactPerson: supplier.contactPerson
+        contactPerson: supplier.contactPerson,
+        userId: supplierUserId.toString()
       },
       message: 'Products retrieved successfully'
     });

@@ -2,60 +2,142 @@ const mongoose = require('mongoose');
 const Inventory = require('../models/Inventory');
 const Product = require('../models/Product');
 const Sale = require('../models/Sale');
+const ManagerOrder = require('../models/ManagerOrder');
 
-// Get all products with inventory information
+// Get all products with inventory information (only products that have been received through deliveries)
 const getAllProducts = async (req, res) => {
   try {
+    console.log('🔍 getAllProducts called for inventory');
+    console.log('👤 User:', req.user);
+    
     const storeId = req.user.storeId;
+    const managerId = req.user.id;
     const { category, status, search, page = 1, limit = 10, sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
+    
+    console.log('📊 Manager ID:', managerId);
+    console.log('🏪 Store ID:', storeId);
+    console.log('🔍 Category filter:', category);
+    console.log('🔍 All query params:', req.query);
 
-    // Build aggregation pipeline
-    let pipeline = [
+    let pipeline = [];
+    
+    // Always show only products from manager's orders (whether "All Categories" or specific category)
+    console.log('📋 Showing products from manager orders');
+    
+    // Get products from manager's orders
+    const ManagerOrder = require('../models/ManagerOrder');
+    
+    const allOrders = await ManagerOrder.find({
+      managerId: new mongoose.Types.ObjectId(managerId),
+      storeId: new mongoose.Types.ObjectId(storeId)
+    }).select('items status orderNumber');
+
+    console.log(`📋 Found ${allOrders.length} total orders for manager`);
+
+    // Extract unique product IDs from all orders
+    const productIds = new Set();
+    allOrders.forEach(order => {
+      console.log(`📦 Order ${order.orderNumber}: ${order.status} (${order.items.length} items)`);
+      order.items.forEach(item => {
+        productIds.add(item.productId.toString());
+        console.log(`  - Product: ${item.productName} (ID: ${item.productId})`);
+      });
+    });
+
+    // Convert to array of ObjectIds
+    const productObjectIds = Array.from(productIds).map(id => new mongoose.Types.ObjectId(id));
+    console.log(`🎯 Unique products from orders: ${productObjectIds.length}`);
+
+    // If no products found in orders, return empty result
+    if (productObjectIds.length === 0) {
+      console.log('❌ No products found in manager orders');
+      
+      return res.json({
+        success: true,
+        data: {
+          products: [],
+          pagination: {
+            current: parseInt(page),
+            total: 0,
+            count: 0,
+            totalRecords: 0
+          }
+        },
+        message: 'No products found in your orders yet.'
+      });
+    }
+
+    // Check if inventory records exist, if not create them
+    for (const order of allOrders) {
+      for (const item of order.items) {
+        const existingInventory = await Inventory.findOne({
+          storeId: new mongoose.Types.ObjectId(storeId),
+          productId: item.productId
+        });
+
+        if (!existingInventory) {
+          console.log(`📦 Creating inventory record for ${item.productName}`);
+          const newInventory = new Inventory({
+            storeId: new mongoose.Types.ObjectId(storeId),
+            productId: item.productId,
+            quantity: item.quantity,
+            reorderLevel: 5,
+            maxStock: 100,
+            stockMovements: [{
+              type: 'in',
+              quantity: item.quantity,
+              reason: 'Order received',
+              reference: order.orderNumber,
+              timestamp: new Date(),
+              updatedBy: new mongoose.Types.ObjectId(managerId)
+            }],
+            updatedBy: new mongoose.Types.ObjectId(managerId)
+          });
+
+          await newInventory.save();
+        }
+      }
+    }
+
+    // Pipeline for manager's order products only
+    pipeline = [
+      {
+        $match: {
+          storeId: new mongoose.Types.ObjectId(storeId),
+          productId: { $in: productObjectIds }
+        }
+      },
       {
         $lookup: {
-          from: 'inventories',
-          let: { productId: '$_id' },
-          pipeline: [
-            {
-              $match: {
-                $expr: {
-                  $and: [
-                    { $eq: ['$productId', '$$productId'] },
-                    { $eq: ['$storeId', mongoose.Types.ObjectId(storeId)] }
-                  ]
-                }
-              }
-            }
-          ],
-          as: 'inventory'
+          from: 'products',
+          localField: 'productId',
+          foreignField: '_id',
+          as: 'product'
+        }
+      },
+      {
+        $unwind: '$product'
+      },
+      {
+        $match: {
+          'product.isActive': true
         }
       },
       {
         $addFields: {
-          inventory: { $arrayElemAt: ['$inventory', 0] },
           stockStatus: {
             $switch: {
               branches: [
                 {
-                  case: { $eq: [{ $ifNull: [{ $arrayElemAt: ['$inventory.quantity', 0] }, 0] }, 0] },
+                  case: { $eq: ['$quantity', 0] },
                   then: 'out_of_stock'
                 },
                 {
-                  case: {
-                    $lte: [
-                      { $ifNull: [{ $arrayElemAt: ['$inventory.quantity', 0] }, 0] },
-                      { $ifNull: [{ $arrayElemAt: ['$inventory.reorderLevel', 0] }, 0] }
-                    ]
-                  },
+                  case: { $lte: ['$quantity', '$reorderLevel'] },
                   then: 'low_stock'
                 },
                 {
-                  case: {
-                    $gte: [
-                      { $ifNull: [{ $arrayElemAt: ['$inventory.quantity', 0] }, 0] },
-                      { $ifNull: [{ $arrayElemAt: ['$inventory.maxStock', 0] }, 100] }
-                    ]
-                  },
+                  case: { $gte: ['$quantity', '$maxStock'] },
                   then: 'overstock'
                 }
               ],
@@ -66,39 +148,106 @@ const getAllProducts = async (req, res) => {
       }
     ];
 
-    // Add filters
-    let matchConditions = { isActive: true };
-    
-    if (category) matchConditions.category = category;
-    if (status === 'low_stock') {
+    // Add category filter if specific category is selected
+    if (category && category !== 'all') {
+      console.log(`🔍 Filtering by category: ${category}`);
       pipeline.push({
-        $match: { stockStatus: 'low_stock' }
-      });
-    } else if (status === 'out_of_stock') {
-      pipeline.push({
-        $match: { stockStatus: 'out_of_stock' }
-      });
-    } else if (status === 'overstock') {
-      pipeline.push({
-        $match: { stockStatus: 'overstock' }
+        $match: { 'product.category': category }
       });
     }
 
+    // Add status filter
+    if (status && ['low_stock', 'out_of_stock', 'overstock', 'in_stock', 'not_tracked'].includes(status)) {
+      pipeline.push({
+        $match: { stockStatus: status }
+      });
+    }
+
+    // Add search filter
     if (search) {
-      matchConditions.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } },
-        { brand: { $regex: search, $options: 'i' } },
-        { barcode: { $regex: search, $options: 'i' } }
-      ];
+      if (category === 'all' || !category) {
+        // For all products view
+        pipeline.push({
+          $match: {
+            $or: [
+              { 'name': { $regex: search, $options: 'i' } },
+              { 'description': { $regex: search, $options: 'i' } },
+              { 'brand': { $regex: search, $options: 'i' } },
+              { 'barcode': { $regex: search, $options: 'i' } }
+            ]
+          }
+        });
+      } else {
+        // For manager's order products
+        pipeline.push({
+          $match: {
+            $or: [
+              { 'product.name': { $regex: search, $options: 'i' } },
+              { 'product.description': { $regex: search, $options: 'i' } },
+              { 'product.brand': { $regex: search, $options: 'i' } },
+              { 'product.barcode': { $regex: search, $options: 'i' } }
+            ]
+          }
+        });
+      }
     }
 
-    pipeline.unshift({ $match: matchConditions });
+    // Restructure the output to match the expected format (always using manager's order products)
+    console.log('🔄 Using manager orders projection');
+    pipeline.push({
+      $project: {
+        _id: '$product._id',
+        name: '$product.name',
+        description: '$product.description',
+        category: '$product.category',
+        brand: '$product.brand',
+        price: '$product.price',
+        costPrice: '$product.costPrice',
+        sku: '$product.sku',
+        barcode: '$product.barcode',
+        image: '$product.image',
+        isActive: '$product.isActive',
+        createdAt: '$product.createdAt',
+        updatedAt: '$product.updatedAt',
+        inventory: {
+          _id: '$_id',
+          quantity: '$quantity',
+          reorderLevel: '$reorderLevel',
+          maxStock: '$maxStock',
+          stockStatus: '$stockStatus',
+          lastUpdated: '$updatedAt'
+        },
+        stockStatus: '$stockStatus'
+      }
+    });
 
-    // Add sorting
-    const sortField = sortBy === 'stockLevel' ? 'inventory.quantity' : sortBy;
+    // Add sorting (always using manager's order products structure)
+    let sortField;
+    if (sortBy === 'stockLevel') {
+      sortField = 'quantity';
+    } else if (sortBy === 'name') {
+      sortField = 'product.name';
+    } else if (sortBy === 'category') {
+      sortField = 'product.category';
+    } else if (sortBy === 'price') {
+      sortField = 'product.price';
+    } else {
+      sortField = 'product.createdAt';
+    }
+    
     const sortDirection = sortOrder === 'desc' ? -1 : 1;
     pipeline.push({ $sort: { [sortField]: sortDirection } });
+
+    console.log('🔄 Pipeline prepared, getting total count...');
+
+    // Get total count for pagination (always using Inventory collection)
+    const totalPipeline = [...pipeline];
+    totalPipeline.push({ $count: 'total' });
+    
+    console.log('📊 Getting total from Inventory collection');
+    const totalResult = await Inventory.aggregate(totalPipeline);
+    const total = totalResult[0]?.total || 0;
+    console.log(`📊 Total products found: ${total}`);
 
     // Add pagination
     const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -107,14 +256,12 @@ const getAllProducts = async (req, res) => {
       { $limit: parseInt(limit) }
     );
 
-    const products = await Product.aggregate(pipeline);
+    console.log('🔄 Executing final pipeline...');
+    console.log('📦 Executing on Inventory collection');
+    const products = await Inventory.aggregate(pipeline);
 
-    // Get total count for pagination
-    const totalPipeline = [...pipeline.slice(0, -2)];
-    totalPipeline.push({ $count: 'total' });
-    const totalResult = await Product.aggregate(totalPipeline);
-    const total = totalResult[0]?.total || 0;
-
+    console.log(`✅ Found ${products.length} products to return`);
+    
     res.json({
       success: true,
       data: {
@@ -129,7 +276,7 @@ const getAllProducts = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get products error:', error);
+    console.error('❌ Get products error:', error);
     res.status(500).json({
       success: false,
       message: 'Error retrieving products',
@@ -160,8 +307,8 @@ const getProductById = async (req, res) => {
       { $unwind: '$items' },
       {
         $match: {
-          'items.productId': mongoose.Types.ObjectId(id),
-          storeId: mongoose.Types.ObjectId(storeId),
+          'items.productId': new mongoose.Types.ObjectId(id),
+          storeId: new mongoose.Types.ObjectId(storeId),
           saleDate: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } // Last 30 days
         }
       },
@@ -472,14 +619,63 @@ const getStockAlerts = async (req, res) => {
 const getInventoryAnalytics = async (req, res) => {
   try {
     const storeId = req.user.storeId;
+    const managerId = req.user.id;
     const { period = '30' } = req.query;
 
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - parseInt(period));
 
-    // Get inventory overview
+    // Get products from manager's orders (same logic as main inventory)
+    const allOrders = await ManagerOrder.find({
+      managerId: new mongoose.Types.ObjectId(managerId),
+      storeId: new mongoose.Types.ObjectId(storeId)
+    }).select('items status orderNumber');
+
+    // Extract unique product IDs from all orders
+    const productIds = new Set();
+    allOrders.forEach(order => {
+      order.items.forEach(item => {
+        productIds.add(item.productId.toString());
+      });
+    });
+
+    // Convert to array of ObjectIds
+    const productObjectIds = Array.from(productIds).map(id => new mongoose.Types.ObjectId(id));
+
+    // If no products found in orders, return empty analytics
+    if (productObjectIds.length === 0) {
+      return res.json({
+        success: true,
+        data: {
+          overview: {
+            totalProducts: 0,
+            totalValue: 0,
+            totalCost: 0,
+            averageStock: 0,
+            lowStockCount: 0,
+            outOfStockCount: 0,
+            overstockCount: 0
+          },
+          categoryBreakdown: [],
+          stockMovements: [],
+          turnoverAnalysis: [],
+          period: {
+            days: parseInt(period),
+            start: startDate.toISOString(),
+            end: new Date().toISOString()
+          }
+        }
+      });
+    }
+
+    // Get inventory overview (only for manager's products)
     const overview = await Inventory.aggregate([
-      { $match: { storeId: mongoose.Types.ObjectId(storeId) } },
+      { 
+        $match: { 
+          storeId: new mongoose.Types.ObjectId(storeId),
+          productId: { $in: productObjectIds }
+        } 
+      },
       {
         $lookup: {
           from: 'products',
@@ -509,9 +705,14 @@ const getInventoryAnalytics = async (req, res) => {
       }
     ]);
 
-    // Get category breakdown
+    // Get category breakdown (only for manager's products)
     const categoryBreakdown = await Inventory.aggregate([
-      { $match: { storeId: mongoose.Types.ObjectId(storeId) } },
+      { 
+        $match: { 
+          storeId: new mongoose.Types.ObjectId(storeId),
+          productId: { $in: productObjectIds }
+        } 
+      },
       {
         $lookup: {
           from: 'products',
@@ -533,9 +734,14 @@ const getInventoryAnalytics = async (req, res) => {
       { $sort: { totalValue: -1 } }
     ]);
 
-    // Get stock movement trends
+    // Get stock movement trends (only for manager's products)
     const stockMovements = await Inventory.aggregate([
-      { $match: { storeId: mongoose.Types.ObjectId(storeId) } },
+      { 
+        $match: { 
+          storeId: new mongoose.Types.ObjectId(storeId),
+          productId: { $in: productObjectIds }
+        } 
+      },
       { $unwind: '$stockMovements' },
       {
         $match: {
@@ -560,13 +766,14 @@ const getInventoryAnalytics = async (req, res) => {
       { $sort: { '_id.date': 1 } }
     ]);
 
-    // Get turnover analysis
+    // Get turnover analysis (only for manager's products)
     const turnoverAnalysis = await Sale.aggregate([
       { $unwind: '$items' },
       {
         $match: {
-          storeId: mongoose.Types.ObjectId(storeId),
-          saleDate: { $gte: startDate }
+          storeId: new mongoose.Types.ObjectId(storeId),
+          saleDate: { $gte: startDate },
+          'items.productId': { $in: productObjectIds }
         }
       },
       {
@@ -587,7 +794,7 @@ const getInventoryAnalytics = async (req, res) => {
                 $expr: {
                   $and: [
                     { $eq: ['$productId', '$$productId'] },
-                    { $eq: ['$storeId', mongoose.Types.ObjectId(storeId)] }
+                    { $eq: ['$storeId', new mongoose.Types.ObjectId(storeId)] }
                   ]
                 }
               }
@@ -655,6 +862,271 @@ const getInventoryAnalytics = async (req, res) => {
 };
 
 // Update reorder settings
+// Test endpoint without auth (temporary)
+const testInventoryDirect = async (req, res) => {
+  try {
+    // Hard-coded manager details from logs
+    const managerId = '687164e2a0f1eabadaf16341';
+    const storeId = '6871614bc7c1418205200192';
+    
+    console.log('🔧 Testing inventory directly for manager:', managerId);
+    
+    // Import ManagerOrder within the function to avoid circular dependency issues
+    const ManagerOrder = require('../models/ManagerOrder');
+    
+    // Get all orders for this manager
+    const orders = await ManagerOrder.find({ managerId: new mongoose.Types.ObjectId(managerId) });
+    console.log(`📋 Found ${orders.length} orders`);
+    
+    const orderDetails = orders.map(order => ({
+      orderNumber: order.orderNumber,
+      status: order.status,
+      itemCount: order.items.length,
+      items: order.items.map(item => ({
+        productName: item.productName,
+        quantity: item.quantity,
+        productId: item.productId
+      }))
+    }));
+    
+    // Get unique product IDs
+    const productIds = new Set();
+    orders.forEach(order => {
+      order.items.forEach(item => {
+        productIds.add(item.productId.toString());
+      });
+    });
+    
+    // Create inventory records if they don't exist
+    let created = 0;
+    for (const order of orders) {
+      for (const item of order.items) {
+        const existingInv = await Inventory.findOne({
+          storeId: new mongoose.Types.ObjectId(storeId),
+          productId: item.productId
+        });
+        
+        if (!existingInv) {
+          const newInventory = new Inventory({
+            storeId: new mongoose.Types.ObjectId(storeId),
+            productId: item.productId,
+            quantity: item.quantity,
+            reorderLevel: 5,
+            maxStock: 100,
+            stockMovements: [{
+              type: 'in',
+              quantity: item.quantity,
+              reason: 'Order received',
+              reference: order.orderNumber,
+              timestamp: new Date(),
+              updatedBy: new mongoose.Types.ObjectId(managerId)
+            }],
+            updatedBy: new mongoose.Types.ObjectId(managerId)
+          });
+          
+          await newInventory.save();
+          console.log(`✅ Created inventory for ${item.productName}: ${item.quantity} units`);
+          created++;
+        }
+      }
+    }
+    
+    // Get final inventory
+    const inventory = await Inventory.find({ storeId: new mongoose.Types.ObjectId(storeId) }).populate('productId');
+    
+    // Test aggregation pipeline
+    const productObjectIds = Array.from(productIds).map(id => new mongoose.Types.ObjectId(id));
+    const pipeline = [
+      {
+        $match: {
+          storeId: new mongoose.Types.ObjectId(storeId),
+          productId: { $in: productObjectIds }
+        }
+      },
+      {
+        $lookup: {
+          from: 'products',
+          localField: 'productId',
+          foreignField: '_id',
+          as: 'product'
+        }
+      },
+      {
+        $unwind: '$product'
+      },
+      {
+        $project: {
+          _id: '$product._id',
+          name: '$product.name',
+          category: '$product.category',
+          price: '$product.price',
+          inventory: {
+            quantity: '$quantity',
+            reorderLevel: '$reorderLevel'
+          }
+        }
+      }
+    ];
+    
+    const aggregationResult = await Inventory.aggregate(pipeline);
+    
+    res.json({
+      success: true,
+      data: {
+        managerId,
+        storeId,
+        orders: orderDetails,
+        inventoryCreated: created,
+        inventoryCount: inventory.length,
+        aggregationResult: aggregationResult,
+        productIds: Array.from(productIds)
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ Test error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error testing inventory',
+      error: error.message
+    });
+  }
+};
+
+// Debug endpoint to check orders (temporary)
+const debugCheckOrders = async (req, res) => {
+  try {
+    const managerId = req.user.id;
+    const storeId = req.user.storeId;
+    
+    console.log('🔧 Debug: Checking orders for manager:', managerId);
+    console.log('🏪 Store ID:', storeId);
+    
+    // Get all orders for this manager
+    const orders = await ManagerOrder.find({ managerId: new mongoose.Types.ObjectId(managerId) });
+    console.log(`📋 Found ${orders.length} orders`);
+    
+    const orderDetails = orders.map(order => ({
+      orderNumber: order.orderNumber,
+      status: order.status,
+      itemCount: order.items.length,
+      items: order.items.map(item => ({
+        productName: item.productName,
+        quantity: item.quantity,
+        productId: item.productId
+      }))
+    }));
+    
+    // Check inventory
+    const inventory = await Inventory.find({ storeId: new mongoose.Types.ObjectId(storeId) });
+    console.log(`📦 Found ${inventory.length} inventory records`);
+    
+    res.json({
+      success: true,
+      data: {
+        managerId,
+        storeId,
+        orders: orderDetails,
+        inventoryCount: inventory.length
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ Debug check error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error checking orders',
+      error: error.message
+    });
+  }
+};
+
+// Debug endpoint to fix orders (temporary)
+const debugFixOrders = async (req, res) => {
+  try {
+    const managerId = req.user.id;
+    const storeId = req.user.storeId;
+    
+    console.log('🔧 Debug: Fixing orders for manager:', managerId);
+    
+    // Get all orders for this manager
+    const orders = await ManagerOrder.find({ managerId: new mongoose.Types.ObjectId(managerId) });
+    console.log(`📋 Found ${orders.length} orders`);
+    
+    let updatedOrders = 0;
+    let createdInventory = 0;
+    
+    for (const order of orders) {
+      if (order.status !== 'delivered') {
+        console.log(`🔧 Updating order ${order.orderNumber} to delivered`);
+        
+        order.status = 'delivered';
+        order.actualDeliveryDate = new Date();
+        order.deliveryAcceptedDate = new Date();
+        order.deliveryAcceptedBy = new mongoose.Types.ObjectId(managerId);
+        order.deliveryStatus = 'complete';
+        
+        // Mark all items as delivered
+        order.items.forEach(item => {
+          item.isDelivered = true;
+          item.deliveredQuantity = item.quantity;
+        });
+        
+        await order.save();
+        updatedOrders++;
+        
+        // Create inventory records
+        for (const item of order.items) {
+          const existingInventory = await Inventory.findOne({
+            storeId: new mongoose.Types.ObjectId(storeId),
+            productId: item.productId
+          });
+          
+          if (!existingInventory) {
+            const newInventory = new Inventory({
+              storeId: new mongoose.Types.ObjectId(storeId),
+              productId: item.productId,
+              quantity: item.deliveredQuantity,
+              reorderLevel: 5,
+              maxStock: 100,
+              stockMovements: [{
+                type: 'in',
+                quantity: item.deliveredQuantity,
+                reason: 'Order delivery',
+                reference: order.orderNumber,
+                timestamp: new Date(),
+                updatedBy: new mongoose.Types.ObjectId(managerId)
+              }],
+              updatedBy: new mongoose.Types.ObjectId(managerId)
+            });
+            
+            await newInventory.save();
+            createdInventory++;
+            console.log(`✅ Created inventory for ${item.productName}: ${item.deliveredQuantity} units`);
+          }
+        }
+      }
+    }
+    
+    res.json({
+      success: true,
+      message: `Fixed ${updatedOrders} orders and created ${createdInventory} inventory records`,
+      data: {
+        updatedOrders,
+        createdInventory
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ Debug fix error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fixing orders',
+      error: error.message
+    });
+  }
+};
+
 const updateReorderSettings = async (req, res) => {
   try {
     const { id } = req.params;
@@ -690,6 +1162,70 @@ const updateReorderSettings = async (req, res) => {
   }
 };
 
+// Get store inventory for staff dashboard
+const getStoreInventory = async (req, res) => {
+  try {
+    const { storeId } = req.params;
+    
+    console.log('🏪 Getting store inventory for storeId:', storeId);
+    
+    // Get all inventory items for the store with populated product details
+    const inventory = await Inventory.find({ storeId })
+      .populate({
+        path: 'productId',
+        select: 'name description category brand price costPrice sku barcode image isActive'
+      })
+      .sort({ 'productId.name': 1 });
+
+    console.log(`📦 Found ${inventory.length} inventory items`);
+    
+    // Filter out items with inactive products
+    const activeInventory = inventory.filter(item => item.productId && item.productId.isActive);
+    
+    console.log(`✅ ${activeInventory.length} active inventory items after filtering`);
+    
+    // Log first item structure for debugging
+    if (activeInventory.length > 0) {
+      console.log('📋 Sample inventory item structure:', {
+        _id: activeInventory[0]._id,
+        quantity: activeInventory[0].quantity,
+        productId: {
+          _id: activeInventory[0].productId._id,
+          name: activeInventory[0].productId.name,
+          price: activeInventory[0].productId.price
+        }
+      });
+      
+      // Log the exact JSON structure being sent
+      console.log('📤 JSON structure being sent to frontend:');
+      console.log(JSON.stringify({
+        _id: activeInventory[0]._id,
+        quantity: activeInventory[0].quantity,
+        productId: {
+          _id: activeInventory[0].productId._id,
+          name: activeInventory[0].productId.name,
+          price: activeInventory[0].productId.price,
+          category: activeInventory[0].productId.category,
+          brand: activeInventory[0].productId.brand
+        }
+      }, null, 2));
+    }
+
+    res.json({
+      success: true,
+      data: { inventory: activeInventory }
+    });
+
+  } catch (error) {
+    console.error('Get store inventory error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get store inventory',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
+  }
+};
+
 module.exports = {
   getAllProducts,
   getProductById,
@@ -699,5 +1235,9 @@ module.exports = {
   updateStock,
   getStockAlerts,
   getInventoryAnalytics,
-  updateReorderSettings
+  updateReorderSettings,
+  getStoreInventory,
+  testInventoryDirect,
+  debugCheckOrders,
+  debugFixOrders
 }; 

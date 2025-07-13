@@ -44,9 +44,15 @@ const requireManager = (req, res, next) => {
   next();
 };
 
-// Apply rate limiting and authentication to all other routes
+// Apply rate limiting and authentication to all routes
 router.use(supplierLimiter);
 router.use(verifyToken);
+
+// Special route for getting supplier products - accessible by both managers and suppliers
+// This needs to be defined before the requireManager middleware is applied to all other routes
+router.get('/:id/products', getSupplierProducts);
+
+// Apply manager role requirement to all other routes
 router.use(requireManager);
 
 // Supplier routes
@@ -55,7 +61,6 @@ router.get('/analytics', getSupplierAnalytics);
 router.get('/by-store', getSuppliersByStore);
 router.get('/debug/store-data', debugStoreData);
 router.get('/:id', getSupplierById);
-router.get('/:id/products', getSupplierProducts);
 router.post('/', createSupplier);
 router.put('/:id', updateSupplier);
 router.post('/:id/approve', approveSupplier);

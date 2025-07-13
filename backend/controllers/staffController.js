@@ -1,15 +1,20 @@
 const StaffProfile = require('../models/StaffProfile');
 const Task = require('../models/Task');
 const User = require('../models/User');
+const { calculateAttendancePerformance } = require('../utils/attendanceGenerator');
+const mongoose = require('mongoose');
 
 // Get all staff for a store
 const getAllStaff = async (req, res) => {
   try {
-    const storeId = req.user.storeId || req.query.storeId;
+    // Handle both populated and non-populated storeId
+    const storeId = req.user.storeId?._id || req.user.storeId || req.query.storeId;
     const { department, position, status, search, page = 1, limit = 10 } = req.query;
 
-    // Build query
-    let query = { storeId };
+    // Build query - convert storeId to ObjectId if it's a string
+    let query = { 
+      storeId: typeof storeId === 'string' ? new mongoose.Types.ObjectId(storeId) : storeId 
+    };
     
     if (department) query.department = department;
     if (position) query.position = position;
@@ -63,23 +68,48 @@ const getAllStaff = async (req, res) => {
               1000 * 60 * 60 * 24 * 365.25
             ]
           }
-        },
-        attendanceRate: {
-          $cond: {
-            if: { $eq: [{ $add: ['$attendance.totalDaysWorked', '$attendance.absences'] }, 0] },
-            then: 100,
-            else: {
-              $multiply: [
-                { $divide: ['$attendance.totalDaysWorked', { $add: ['$attendance.totalDaysWorked', '$attendance.absences'] }] },
-                100
-              ]
-            }
-          }
         }
       }
     });
 
     const staff = await StaffProfile.aggregate(pipeline);
+
+    // Calculate performance and attendance for each staff member using the new system
+    const staffWithPerformance = await Promise.all(
+      staff.map(async (member) => {
+        try {
+          // Calculate performance based on attendance using the new system
+          const performanceData = await calculateAttendancePerformance(member._id);
+          
+          // Update the member object with calculated values
+          return {
+            ...member,
+            performance: {
+              ...member.performance, // Keep existing performance data first
+              rating: performanceData.rating, // Override with calculated rating
+              attendanceBasedRating: performanceData.rating,
+              lastUpdated: new Date(),
+              attendanceBreakdown: performanceData.breakdown
+            },
+            attendanceRate: performanceData.attendanceRate,
+            attendanceBreakdown: performanceData.breakdown
+          };
+        } catch (error) {
+          console.error(`Error calculating performance for staff ${member._id}:`, error);
+          // Return member with default values if calculation fails
+          return {
+            ...member,
+            performance: {
+              rating: 3.0,
+              ...member.performance,
+              lastUpdated: new Date()
+            },
+            attendanceRate: 0,
+            attendanceBreakdown: null
+          };
+        }
+      })
+    );
 
     // Get total count for pagination
     const totalQuery = [...pipeline.slice(0, -3)]; // Remove sort, skip, limit
@@ -90,11 +120,11 @@ const getAllStaff = async (req, res) => {
     res.json({
       success: true,
       data: {
-        staff,
+        staff: staffWithPerformance,
         pagination: {
           current: parseInt(page),
           total: Math.ceil(total / parseInt(limit)),
-          count: staff.length,
+          count: staffWithPerformance.length,
           totalRecords: total
         }
       }

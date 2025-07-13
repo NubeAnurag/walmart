@@ -18,7 +18,7 @@ const saleSchema = new mongoose.Schema({
   },
   staffId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'StaffProfile',
+    ref: 'User',
     required: true
   },
   items: [{
@@ -136,9 +136,10 @@ const saleSchema = new mongoose.Schema({
     aisle: String
   },
   customerInfo: {
-    loyaltyNumber: String,
+    name: String,
     email: String,
     phone: String,
+    loyaltyNumber: String,
     isNewCustomer: Boolean
   },
   notes: String,

@@ -7,6 +7,7 @@ const StaffLoginPage = () => {
   const [formData, setFormData] = useState({
     email: '',
     password: '',
+    staffType: '',
   });
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState({});
@@ -41,6 +42,10 @@ const StaffLoginPage = () => {
     
     if (!formData.password) {
       newErrors.password = 'Password is required';
+    }
+
+    if (!formData.staffType) {
+      newErrors.staffType = 'Staff type is required';
     }
     
     setErrors(newErrors);
@@ -170,6 +175,29 @@ const StaffLoginPage = () => {
               </div>
               {errors.password && (
                 <p className="text-red-500 text-sm mt-1">{errors.password}</p>
+              )}
+            </div>
+
+            {/* Staff Type Field */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Staff Type
+              </label>
+              <select
+                name="staffType"
+                value={formData.staffType}
+                onChange={handleChange}
+                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent ${
+                  errors.staffType ? 'border-red-300' : 'border-gray-300'
+                }`}
+                disabled={isSubmitting}
+              >
+                <option value="">Select Staff Type</option>
+                <option value="cashier">Cashier</option>
+                <option value="inventory">Inventory</option>
+              </select>
+              {errors.staffType && (
+                <p className="text-red-500 text-sm mt-1">{errors.staffType}</p>
               )}
             </div>
 

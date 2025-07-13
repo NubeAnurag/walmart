@@ -19,11 +19,13 @@ const analyticsRoutes = require('./routes/analytics');
 const supplierRoutes = require('./routes/suppliers');
 const supplierDashboardRoutes = require('./routes/supplier');
 const inventoryRoutes = require('./routes/inventory');
+const salesRoutes = require('./routes/sales');
 const reportsRoutes = require('./routes/reports');
 const customerInsightsRoutes = require('./routes/customerInsights');
 const storeRoutes = require('./routes/stores');
 const adminRoutes = require('./routes/admin');
 const managerOrderRoutes = require('./routes/managerOrders');
+const customerRoutes = require('./routes/customer');
 
 const app = express();
 const server = http.createServer(app);
@@ -63,9 +65,15 @@ app.use(helmet({
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
     ? ['https://your-production-domain.com'] 
-    : ['http://localhost:3000', 'http://127.0.0.1:3000'],
+    : [
+        'http://localhost:3000', 
+        'http://127.0.0.1:3000', 
+        'http://192.168.29.4:3000',
+        'http://localhost:5001',
+        'http://192.168.29.4:5001'
+      ],
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
 }));
 
@@ -113,6 +121,62 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/suppliers', supplierRoutes);
 app.use('/api/supplier', supplierDashboardRoutes);
 app.use('/api/inventory', inventoryRoutes);
+app.use('/api/sales', salesRoutes);
+app.use('/api/attendance', require('./routes/attendance'));
+app.use('/api/customer', customerRoutes);
+
+// Temporary test route for inventory debugging
+const { testInventoryDirect, getAllProducts } = require('./controllers/inventoryController');
+app.get('/api/test-inventory', testInventoryDirect);
+
+// Test route for getAllProducts without auth
+app.get('/api/test-all-products', async (req, res) => {
+  try {
+    // Mock user object for testing
+    req.user = {
+      id: '687164e2a0f1eabadaf16341',
+      storeId: '6871614bc7c1418205200192',
+      role: 'manager'
+    };
+    
+    console.log('🧪 Testing getAllProducts without auth');
+    await getAllProducts(req, res);
+  } catch (error) {
+    console.error('❌ Test error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Test failed',
+      error: error.message
+    });
+  }
+});
+
+// Test route for staff API without auth
+app.get('/api/test-staff', async (req, res) => {
+  try {
+    const { getAllStaff } = require('./controllers/staffController');
+    const mongoose = require('mongoose');
+    
+    // Mock user object for Manas Adhikari with ObjectId
+    req.user = {
+      id: new mongoose.Types.ObjectId('6871837c17bba8a7aba8d081'), // Manas's actual ID
+      storeId: new mongoose.Types.ObjectId('6871614bc7c141820520018f'), // Walmart Supercenter - Uptown
+      role: 'manager'
+    };
+    
+    console.log('🧪 Testing getAllStaff without auth');
+    console.log('🧪 Mock user:', req.user);
+    
+    await getAllStaff(req, res);
+  } catch (error) {
+    console.error('❌ Test staff error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Test failed',
+      error: error.message
+    });
+  }
+});
 app.use('/api/reports', reportsRoutes);
 app.use('/api/customer-insights', customerInsightsRoutes);
 app.use('/api/stores', storeRoutes);
@@ -227,12 +291,13 @@ process.on('SIGINT', async () => {
 });
 
 // Start server
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Walmart Digital Revolution API running on port ${PORT}`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
+  console.log(`🌐 Network access: http://192.168.29.4:${PORT}/health`);
   console.log(`🍃 Database: MongoDB`);
   console.log(`⚡ Socket.io: Real-time features enabled`);
 });
 
-module.exports = { app, server, io }; 
+module.exports = { app, server, io };

@@ -6,6 +6,7 @@ const StaffProfile = require('../models/StaffProfile');
 const Task = require('../models/Task');
 const Supplier = require('../models/Supplier');
 const PurchaseOrder = require('../models/PurchaseOrder');
+const ManagerOrder = require('../models/ManagerOrder');
 
 // Get dashboard overview data
 const getDashboardOverview = async (req, res) => {
@@ -274,10 +275,61 @@ const getSalesAnalytics = async (req, res) => {
 const getInventoryAnalytics = async (req, res) => {
   try {
     const storeId = req.user.storeId;
+    const managerId = req.user.id;
+    const userRole = req.user.role;
+
+    // If user is a manager, show only their products from orders
+    let productFilter = {};
+    if (userRole === 'manager') {
+      // Get products from manager's orders
+      const allOrders = await ManagerOrder.find({
+        managerId: new mongoose.Types.ObjectId(managerId),
+        storeId: new mongoose.Types.ObjectId(storeId)
+      }).select('items');
+
+      // Extract unique product IDs from all orders
+      const productIds = new Set();
+      allOrders.forEach(order => {
+        order.items.forEach(item => {
+          productIds.add(item.productId.toString());
+        });
+      });
+
+      // Convert to array of ObjectIds
+      const productObjectIds = Array.from(productIds).map(id => new mongoose.Types.ObjectId(id));
+      
+      if (productObjectIds.length > 0) {
+        productFilter = { productId: { $in: productObjectIds } };
+      } else {
+        // No products from orders, return empty analytics
+        return res.json({
+          success: true,
+          data: {
+            overview: {
+              totalProducts: 0,
+              totalValue: 0,
+              totalCost: 0,
+              averageStock: 0,
+              lowStockCount: 0,
+              outOfStockCount: 0,
+              overstockCount: 0
+            },
+            categoryBreakdown: [],
+            lowStockItems: [],
+            stockMovements: []
+          }
+        });
+      }
+    }
 
     // Get inventory overview
     const inventoryOverview = await Inventory.aggregate([
-      { $match: { storeId: new mongoose.Types.ObjectId(storeId) } },
+      { 
+        $match: { 
+          storeId: new mongoose.Types.ObjectId(storeId),
+          ...productFilter
+        } 
+      },
       {
         $lookup: {
           from: 'products',
@@ -315,7 +367,12 @@ const getInventoryAnalytics = async (req, res) => {
 
     // Get category breakdown
     const categoryBreakdown = await Inventory.aggregate([
-      { $match: { storeId: new mongoose.Types.ObjectId(storeId) } },
+      { 
+        $match: { 
+          storeId: new mongoose.Types.ObjectId(storeId),
+          ...productFilter
+        } 
+      },
       {
         $lookup: {
           from: 'products',
@@ -345,9 +402,14 @@ const getInventoryAnalytics = async (req, res) => {
     // Get low stock items
     const lowStockItems = await Inventory.findLowStock(storeId);
 
-    // Get stock movement trends (simulated for now)
+    // Get stock movement trends
     const stockMovements = await Inventory.aggregate([
-      { $match: { storeId: new mongoose.Types.ObjectId(storeId) } },
+      { 
+        $match: { 
+          storeId: new mongoose.Types.ObjectId(storeId),
+          ...productFilter
+        } 
+      },
       { $unwind: '$stockMovements' },
       {
         $group: {
@@ -602,10 +664,416 @@ const getRealTimeAlerts = async (req, res) => {
   }
 };
 
+// Get supplier performance metrics
+const getSupplierPerformanceMetrics = async (req, res) => {
+  try {
+    const storeId = req.user.storeId;
+    const { period = '30', supplierId, startDate, endDate } = req.query;
+
+    let start, end;
+    if (startDate && endDate) {
+      start = new Date(startDate);
+      end = new Date(endDate);
+    } else {
+      start = new Date();
+      start.setDate(start.getDate() - parseInt(period));
+      end = new Date();
+    }
+
+    // Base query for orders
+    const baseQuery = {
+      storeId: new mongoose.Types.ObjectId(storeId),
+      orderDate: { $gte: start, $lte: end },
+      status: { $in: ['approved', 'delivered'] }
+    };
+
+    if (supplierId) {
+      baseQuery.supplierId = new mongoose.Types.ObjectId(supplierId);
+    }
+
+    // Get overall supplier performance metrics
+    const supplierMetrics = await ManagerOrder.aggregate([
+      { $match: baseQuery },
+      {
+        $lookup: {
+          from: 'suppliers',
+          localField: 'supplierId',
+          foreignField: 'userId',
+          as: 'supplier'
+        }
+      },
+      { $unwind: '$supplier' },
+      {
+        $group: {
+          _id: '$supplierId',
+          supplierName: { $first: '$supplierName' },
+          companyName: { $first: '$supplier.companyName' },
+          totalOrders: { $sum: 1 },
+          deliveredOrders: {
+            $sum: { $cond: [{ $eq: ['$status', 'delivered'] }, 1, 0] }
+          },
+          totalOrderValue: { $sum: '$totalAmount' },
+          totalOrderedItems: { $sum: '$totalOrderedItems' },
+          totalDeliveredItems: { $sum: '$totalDeliveredItems' },
+          // On-time delivery calculation
+          onTimeDeliveries: {
+            $sum: {
+              $cond: [
+                {
+                  $and: [
+                    { $eq: ['$status', 'delivered'] },
+                    { $lte: ['$deliveryAcceptedDate', '$expectedDeliveryDate'] }
+                  ]
+                },
+                1,
+                0
+              ]
+            }
+          },
+          // Early deliveries
+          earlyDeliveries: {
+            $sum: {
+              $cond: [
+                {
+                  $and: [
+                    { $eq: ['$status', 'delivered'] },
+                    { $lt: ['$deliveryAcceptedDate', '$expectedDeliveryDate'] }
+                  ]
+                },
+                1,
+                0
+              ]
+            }
+          },
+          // Late deliveries
+          lateDeliveries: {
+            $sum: {
+              $cond: [
+                {
+                  $and: [
+                    { $eq: ['$status', 'delivered'] },
+                    { $gt: ['$deliveryAcceptedDate', '$expectedDeliveryDate'] }
+                  ]
+                },
+                1,
+                0
+              ]
+            }
+          },
+          // Average delivery time difference (in days)
+          avgDeliveryTimeDiff: {
+            $avg: {
+              $cond: [
+                { $eq: ['$status', 'delivered'] },
+                {
+                  $divide: [
+                    { $subtract: ['$deliveryAcceptedDate', '$expectedDeliveryDate'] },
+                    86400000 // Convert milliseconds to days
+                  ]
+                },
+                null
+              ]
+            }
+          },
+          // Perfect deliveries (100% quantity delivered on time)
+          perfectDeliveries: {
+            $sum: {
+              $cond: [
+                {
+                  $and: [
+                    { $eq: ['$status', 'delivered'] },
+                    { $eq: ['$deliveryStatus', 'complete'] },
+                    { $lte: ['$deliveryAcceptedDate', '$expectedDeliveryDate'] }
+                  ]
+                },
+                1,
+                0
+              ]
+            }
+          },
+          // Partial deliveries
+          partialDeliveries: {
+            $sum: {
+              $cond: [
+                {
+                  $and: [
+                    { $eq: ['$status', 'delivered'] },
+                    { $eq: ['$deliveryStatus', 'partial'] }
+                  ]
+                },
+                1,
+                0
+              ]
+            }
+          }
+        }
+      },
+      {
+        $addFields: {
+          // Calculate performance percentages
+          deliveryCompletionRate: {
+            $cond: [
+              { $gt: ['$totalOrders', 0] },
+              { $multiply: [{ $divide: ['$deliveredOrders', '$totalOrders'] }, 100] },
+              0
+            ]
+          },
+          onTimeDeliveryRate: {
+            $cond: [
+              { $gt: ['$deliveredOrders', 0] },
+              { $multiply: [{ $divide: ['$onTimeDeliveries', '$deliveredOrders'] }, 100] },
+              0
+            ]
+          },
+          quantityAccuracyRate: {
+            $cond: [
+              { $gt: ['$totalOrderedItems', 0] },
+              { $multiply: [{ $divide: ['$totalDeliveredItems', '$totalOrderedItems'] }, 100] },
+              0
+            ]
+          },
+          perfectDeliveryRate: {
+            $cond: [
+              { $gt: ['$deliveredOrders', 0] },
+              { $multiply: [{ $divide: ['$perfectDeliveries', '$deliveredOrders'] }, 100] },
+              0
+            ]
+          },
+          partialDeliveryRate: {
+            $cond: [
+              { $gt: ['$deliveredOrders', 0] },
+              { $multiply: [{ $divide: ['$partialDeliveries', '$deliveredOrders'] }, 100] },
+              0
+            ]
+          },
+          // Overall performance score (weighted average)
+          performanceScore: {
+            $avg: [
+              // On-time delivery (40% weight)
+              { $multiply: [
+                { $cond: [
+                  { $gt: ['$deliveredOrders', 0] },
+                  { $divide: ['$onTimeDeliveries', '$deliveredOrders'] },
+                  0
+                ]}, 40
+              ]},
+              // Quantity accuracy (35% weight)
+              { $multiply: [
+                { $cond: [
+                  { $gt: ['$totalOrderedItems', 0] },
+                  { $divide: ['$totalDeliveredItems', '$totalOrderedItems'] },
+                  0
+                ]}, 35
+              ]},
+              // Delivery completion (25% weight)
+              { $multiply: [
+                { $cond: [
+                  { $gt: ['$totalOrders', 0] },
+                  { $divide: ['$deliveredOrders', '$totalOrders'] },
+                  0
+                ]}, 25
+              ]}
+            ]
+          }
+        }
+      },
+      { $sort: { performanceScore: -1 } }
+    ]);
+
+    // Get delivery timeline trends
+    const deliveryTrends = await ManagerOrder.aggregate([
+      { $match: { ...baseQuery, status: 'delivered' } },
+      {
+        $group: {
+          _id: {
+            date: { $dateToString: { format: '%Y-%m-%d', date: '$deliveryAcceptedDate' } },
+            supplierId: '$supplierId'
+          },
+          supplierName: { $first: '$supplierName' },
+          deliveries: { $sum: 1 },
+          onTimeDeliveries: {
+            $sum: {
+              $cond: [
+                { $lte: ['$deliveryAcceptedDate', '$expectedDeliveryDate'] },
+                1,
+                0
+              ]
+            }
+          },
+          totalItems: { $sum: '$totalOrderedItems' },
+          deliveredItems: { $sum: '$totalDeliveredItems' },
+          avgDeliveryDelay: {
+            $avg: {
+              $divide: [
+                { $subtract: ['$deliveryAcceptedDate', '$expectedDeliveryDate'] },
+                86400000
+              ]
+            }
+          }
+        }
+      },
+      {
+        $addFields: {
+          onTimeRate: {
+            $cond: [
+              { $gt: ['$deliveries', 0] },
+              { $multiply: [{ $divide: ['$onTimeDeliveries', '$deliveries'] }, 100] },
+              0
+            ]
+          },
+          accuracyRate: {
+            $cond: [
+              { $gt: ['$totalItems', 0] },
+              { $multiply: [{ $divide: ['$deliveredItems', '$totalItems'] }, 100] },
+              0
+            ]
+          }
+        }
+      },
+      { $sort: { '_id.date': 1 } }
+    ]);
+
+    // Get top and bottom performers
+    const topPerformers = supplierMetrics.slice(0, 5);
+    const bottomPerformers = supplierMetrics.slice(-5).reverse();
+
+    // Get category-wise performance
+    const categoryPerformance = await ManagerOrder.aggregate([
+      { $match: baseQuery },
+      { $unwind: '$items' },
+      {
+        $lookup: {
+          from: 'products',
+          localField: 'items.productId',
+          foreignField: '_id',
+          as: 'product'
+        }
+      },
+      { $unwind: '$product' },
+      {
+        $group: {
+          _id: '$product.category',
+          totalOrders: { $sum: 1 },
+          deliveredOrders: {
+            $sum: { $cond: [{ $eq: ['$status', 'delivered'] }, 1, 0] }
+          },
+          onTimeDeliveries: {
+            $sum: {
+              $cond: [
+                {
+                  $and: [
+                    { $eq: ['$status', 'delivered'] },
+                    { $lte: ['$deliveryAcceptedDate', '$expectedDeliveryDate'] }
+                  ]
+                },
+                1,
+                0
+              ]
+            }
+          },
+          totalValue: { $sum: '$items.totalPrice' },
+          totalQuantityOrdered: { $sum: '$items.quantity' },
+          totalQuantityDelivered: { $sum: '$items.deliveredQuantity' }
+        }
+      },
+      {
+        $addFields: {
+          deliveryRate: {
+            $cond: [
+              { $gt: ['$totalOrders', 0] },
+              { $multiply: [{ $divide: ['$deliveredOrders', '$totalOrders'] }, 100] },
+              0
+            ]
+          },
+          onTimeRate: {
+            $cond: [
+              { $gt: ['$deliveredOrders', 0] },
+              { $multiply: [{ $divide: ['$onTimeDeliveries', '$deliveredOrders'] }, 100] },
+              0
+            ]
+          },
+          accuracyRate: {
+            $cond: [
+              { $gt: ['$totalQuantityOrdered', 0] },
+              { $multiply: [{ $divide: ['$totalQuantityDelivered', '$totalQuantityOrdered'] }, 100] },
+              0
+            ]
+          }
+        }
+      },
+      { $sort: { totalValue: -1 } }
+    ]);
+
+    // Calculate overall metrics
+    const overallMetrics = {
+      totalSuppliers: supplierMetrics.length,
+      avgOnTimeDeliveryRate: supplierMetrics.length > 0 
+        ? supplierMetrics.reduce((sum, s) => sum + s.onTimeDeliveryRate, 0) / supplierMetrics.length 
+        : 0,
+      avgQuantityAccuracyRate: supplierMetrics.length > 0 
+        ? supplierMetrics.reduce((sum, s) => sum + s.quantityAccuracyRate, 0) / supplierMetrics.length 
+        : 0,
+      avgPerformanceScore: supplierMetrics.length > 0 
+        ? supplierMetrics.reduce((sum, s) => sum + s.performanceScore, 0) / supplierMetrics.length 
+        : 0,
+      totalOrderValue: supplierMetrics.reduce((sum, s) => sum + s.totalOrderValue, 0),
+      totalOrders: supplierMetrics.reduce((sum, s) => sum + s.totalOrders, 0),
+      totalDeliveredOrders: supplierMetrics.reduce((sum, s) => sum + s.deliveredOrders, 0)
+    };
+
+    // Check if there's no data
+    if (supplierMetrics.length === 0) {
+      return res.json({
+        success: true,
+        data: {
+          overview: overallMetrics,
+          suppliers: [],
+          topPerformers: [],
+          bottomPerformers: [],
+          deliveryTrends: [],
+          categoryPerformance: [],
+          period: {
+            start: start.toISOString(),
+            end: end.toISOString(),
+            days: parseInt(period)
+          },
+          message: 'No supplier performance data available for the selected period. Performance metrics will be available after orders are delivered and accepted.'
+        }
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        overview: overallMetrics,
+        suppliers: supplierMetrics,
+        topPerformers,
+        bottomPerformers,
+        deliveryTrends,
+        categoryPerformance,
+        period: {
+          start: start.toISOString(),
+          end: end.toISOString(),
+          days: parseInt(period)
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Get supplier performance metrics error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error retrieving supplier performance metrics',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
+  }
+};
+
 module.exports = {
   getDashboardOverview,
   getSalesAnalytics,
   getInventoryAnalytics,
   getPerformanceMetrics,
-  getRealTimeAlerts
+  getRealTimeAlerts,
+  getSupplierPerformanceMetrics
 }; 

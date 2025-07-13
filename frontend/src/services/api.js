@@ -165,8 +165,8 @@ export const supplierAPI = {
     return response.data;
   },
 
-  updateManagerOrderStatus: async (orderId, status, notes = '') => {
-    const response = await api.patch(`/manager-orders/orders/${orderId}/status`, { status, notes });
+  updateManagerOrderStatus: async (orderId, requestData) => {
+    const response = await api.patch(`/manager-orders/orders/${orderId}/status`, requestData);
     return response.data;
   },
 
@@ -205,10 +205,14 @@ export const managerAPI = {
 
   getSupplierProducts: async (supplierId, params = {}) => {
     try {
+      console.log('🔍 Fetching products for supplier:', supplierId);
+      // Use the correct endpoint from the supplier routes
       const response = await api.get(`/suppliers/${supplierId}/products`, { params });
+      console.log('📦 Supplier products response:', response.data);
       return response.data;
     } catch (error) {
-      console.error('Error fetching supplier products:', error);
+      console.error('❌ Error fetching supplier products:', error);
+      console.error('❌ Error details:', error.response?.data);
       throw error;
     }
   },
@@ -221,8 +225,19 @@ export const managerAPI = {
 
   // Staff
   getStaff: async () => {
-    const response = await api.get('/staff');
-    return response.data;
+    console.log('🌐 Calling getStaff API endpoint: /staff');
+    try {
+      const response = await api.get('/staff');
+      console.log('📥 getStaff raw response:', response);
+      console.log('📥 getStaff response data:', response.data);
+      console.log('📥 getStaff response status:', response.status);
+      return response.data;
+    } catch (error) {
+      console.error('❌ getStaff API error:', error);
+      console.error('❌ Error response:', error.response?.data);
+      console.error('❌ Error status:', error.response?.status);
+      throw error;
+    }
   },
 
   // Inventory
@@ -262,6 +277,246 @@ export const managerAPI = {
   getOrderDetails: async (orderId) => {
     const response = await api.get(`/manager-orders/orders/${orderId}`);
     return response.data;
+  },
+
+  acceptDelivery: async (orderId, deliveryData) => {
+    const response = await api.post(`/manager-orders/orders/${orderId}/delivery`, deliveryData);
+    return response.data;
+  },
+
+  // Get supplier performance metrics
+  getSupplierPerformanceMetrics: async (params = {}) => {
+    try {
+      console.log('🔍 Fetching supplier performance metrics with params:', params);
+      const response = await api.get('/analytics/supplier-performance', { params });
+      console.log('📊 Supplier performance metrics response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('❌ Error fetching supplier performance metrics:', error);
+      console.error('❌ Error details:', error.response?.data);
+      throw error;
+    }
+  },
+
+  // Inventory Management
+  getInventoryProducts: async (params = {}) => {
+    try {
+      console.log('📦 Fetching inventory products with params:', params);
+      console.log('📦 API base URL:', api.defaults.baseURL);
+      console.log('📦 Full URL will be:', api.defaults.baseURL + '/inventory/products');
+      const response = await api.get('/inventory/products', { params });
+      console.log('📦 Inventory products response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('❌ Error fetching inventory products:', error);
+      console.error('❌ Error response status:', error.response?.status);
+      console.error('❌ Error details:', error.response?.data);
+      throw error;
+    }
+  },
+
+  getInventoryProduct: async (productId) => {
+    try {
+      const response = await api.get(`/inventory/products/${productId}`);
+      return response.data;
+    } catch (error) {
+      console.error('❌ Error fetching inventory product:', error);
+      throw error;
+    }
+  },
+
+  updateStock: async (productId, stockData) => {
+    try {
+      console.log('📦 Updating stock for product:', productId, stockData);
+      const response = await api.post(`/inventory/products/${productId}/stock`, stockData);
+      console.log('📦 Stock update response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('❌ Error updating stock:', error);
+      console.error('❌ Error details:', error.response?.data);
+      throw error;
+    }
+  },
+
+  getStockAlerts: async (params = {}) => {
+    try {
+      const response = await api.get('/inventory/alerts', { params });
+      return response.data;
+    } catch (error) {
+      console.error('❌ Error fetching stock alerts:', error);
+      throw error;
+    }
+  },
+
+  // Attendance Management
+  getStaffAttendance: async (staffId, year, month) => {
+    try {
+      console.log('📅 Fetching staff attendance:', { staffId, year, month });
+      const response = await api.get(`/attendance/staff/${staffId}`, {
+        params: { year, month }
+      });
+      console.log('📅 Staff attendance response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('❌ Error fetching staff attendance:', error);
+      throw error;
+    }
+  },
+
+  markAttendance: async (staffId, attendanceData) => {
+    try {
+      console.log('📅 Marking attendance for staff:', staffId, attendanceData);
+      const response = await api.post(`/attendance/staff/${staffId}/mark`, attendanceData);
+      console.log('📅 Mark attendance response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('❌ Error marking attendance:', error);
+      throw error;
+    }
+  },
+
+  getStoreAttendanceSummary: async (date) => {
+    try {
+      console.log('📅 Fetching store attendance summary for date:', date);
+      const response = await api.get('/attendance/store/summary', {
+        params: { date }
+      });
+      console.log('📅 Store attendance summary response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('❌ Error fetching store attendance summary:', error);
+      throw error;
+    }
+  },
+
+  getStaffAttendanceStats: async (staffId, year, month) => {
+    try {
+      console.log('📅 Fetching staff attendance stats:', { staffId, year, month });
+      const response = await api.get(`/attendance/staff/${staffId}/stats`, {
+        params: { year, month }
+      });
+      console.log('📅 Staff attendance stats response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('❌ Error fetching staff attendance stats:', error);
+      throw error;
+    }
+  },
+
+  getStaffPerformanceInsights: async (staffId) => {
+    try {
+      console.log('🎯 Fetching staff performance insights for ID:', staffId);
+      console.log('🎯 API URL:', `/attendance/staff/${staffId}/insights`);
+      console.log('🎯 Full URL:', api.defaults.baseURL + `/attendance/staff/${staffId}/insights`);
+      
+      const response = await api.get(`/attendance/staff/${staffId}/insights`);
+      console.log('🎯 Staff performance insights response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('❌ Error fetching staff performance insights:', error);
+      console.error('❌ Error status:', error.response?.status);
+      console.error('❌ Error data:', error.response?.data);
+      console.error('❌ Error message:', error.message);
+      throw error;
+    }
+  },
+
+  updateStaffPerformance: async (staffId) => {
+    try {
+      console.log('🎯 Updating staff performance rating:', staffId);
+      const response = await api.post(`/attendance/staff/${staffId}/performance`);
+      console.log('🎯 Staff performance update response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('❌ Error updating staff performance:', error);
+      throw error;
+    }
+  },
+
+  getInventoryAnalytics: async () => {
+    try {
+      const response = await api.get('/inventory/analytics');
+      return response.data;
+    } catch (error) {
+      console.error('❌ Error fetching inventory analytics:', error);
+      throw error;
+    }
+  },
+
+  debugCheckOrders: async () => {
+    try {
+      console.log('🔍 Calling debug check orders API...');
+      const response = await api.get('/inventory/debug/check-orders');
+      console.log('🔍 Debug check orders response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('❌ Error in debug check orders:', error);
+      throw error;
+    }
+  },
+
+  debugFixOrders: async () => {
+    try {
+      console.log('🔧 Calling debug fix orders API...');
+      const response = await api.post('/inventory/debug/fix-orders');
+      console.log('🔧 Debug fix orders response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('❌ Error in debug fix orders:', error);
+      throw error;
+    }
+  },
+};
+
+// Staff API functions (for staff to view their own data)
+export const staffAPI = {
+  // Get my attendance data
+  getMyAttendance: async (year, month) => {
+    try {
+      console.log('🎯 staffAPI.getMyAttendance: Starting request for year:', year, 'month:', month);
+      const params = {};
+      if (year) params.year = year;
+      if (month) params.month = month;
+      
+      console.log('🎯 staffAPI.getMyAttendance: Making request to /attendance/my-attendance with params:', params);
+      const response = await api.get('/attendance/my-attendance', { params });
+      console.log('🎯 staffAPI.getMyAttendance: Received response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('❌ staffAPI.getMyAttendance: Error fetching my attendance:', error);
+      console.error('❌ Error response:', error.response?.data);
+      console.error('❌ Error status:', error.response?.status);
+      throw error;
+    }
+  },
+
+  // Get my performance insights
+  getMyPerformanceInsights: async () => {
+    try {
+      console.log('🎯 staffAPI.getMyPerformanceInsights: Starting request');
+      console.log('🎯 staffAPI.getMyPerformanceInsights: Making request to /attendance/my-performance');
+      const response = await api.get('/attendance/my-performance');
+      console.log('🎯 staffAPI.getMyPerformanceInsights: Received response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('❌ staffAPI.getMyPerformanceInsights: Error fetching my performance insights:', error);
+      console.error('❌ Error response:', error.response?.data);
+      console.error('❌ Error status:', error.response?.status);
+      throw error;
+    }
+  },
+
+  // Debug method to check current user
+  debugWhoAmI: async () => {
+    try {
+      console.log('🔍 Checking current user...');
+      const response = await api.get('/attendance/debug/whoami');
+      console.log('🔍 Current user:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('❌ Error checking current user:', error);
+      throw error;
+    }
   },
 };
 
@@ -325,6 +580,93 @@ export const generalAPI = {
 };
 
 // Error handling utility
+// Inventory API functions
+export const inventoryAPI = {
+  getStoreInventory: async (storeId) => {
+    const response = await api.get(`/inventory/store/${storeId}`);
+    return response.data;
+  },
+
+  getProducts: async (params) => {
+    const response = await api.get('/inventory/products', { params });
+    return response.data;
+  },
+
+  getProduct: async (productId) => {
+    const response = await api.get(`/inventory/products/${productId}`);
+    return response.data;
+  },
+
+  updateStock: async (productId, stockData) => {
+    const response = await api.post(`/inventory/products/${productId}/stock`, stockData);
+    return response.data;
+  },
+};
+
+// Sales API functions
+export const salesAPI = {
+  createSale: async (saleData) => {
+    const response = await api.post('/sales', saleData);
+    return response.data;
+  },
+
+  getStoreSales: async (storeId, params) => {
+    const response = await api.get(`/sales/store/${storeId}`, { params });
+    return response.data;
+  },
+
+  getSale: async (saleId) => {
+    const response = await api.get(`/sales/${saleId}`);
+    return response.data;
+  },
+
+  getSalesAnalytics: async (storeId, params) => {
+    const response = await api.get(`/sales/store/${storeId}/analytics`, { params });
+    return response.data;
+  },
+
+  downloadReceipt: async (saleId, format = 'pdf') => {
+    try {
+      console.log('🌐 Downloading receipt for sale ID:', saleId, 'in format:', format);
+      
+      // Set appropriate headers based on format
+      let acceptHeader;
+      switch (format) {
+        case 'pdf':
+          acceptHeader = 'application/pdf';
+          break;
+        case 'jpeg':
+        case 'jpg':
+          acceptHeader = 'image/jpeg';
+          break;
+        case 'png':
+          acceptHeader = 'image/png';
+          break;
+        default:
+          acceptHeader = 'application/pdf';
+      }
+      
+      const response = await api.get(`/sales/${saleId}/receipt`, {
+        params: { format }, // Send format as query parameter
+        responseType: 'blob', // Important for binary download
+        headers: {
+          'Accept': acceptHeader
+        }
+      });
+      console.log('📥 Receipt API response received:', {
+        status: response.status,
+        statusText: response.statusText,
+        headers: response.headers,
+        format: format
+      });
+      return response;
+    } catch (error) {
+      console.error('❌ Receipt API error:', error);
+      throw error;
+    }
+  },
+};
+
 export const handleAPIError = (error) => {
   if (error.response) {
     // Server responded with error status

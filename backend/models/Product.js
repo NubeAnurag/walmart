@@ -70,9 +70,12 @@ const productSchema = new mongoose.Schema({
       validate: {
         validator: function(v) {
           if (!v) return true; // Allow null/empty
-          // Allow Cloudinary URLs and regular HTTP/HTTPS URLs
-          const isUrl = /^https?:\/\/.+\.(jpg|jpeg|png|webp|gif)$/i.test(v) || 
-                       /^https:\/\/res\.cloudinary\.com\//.test(v);
+          // Allow Cloudinary URLs and regular HTTP/HTTPS URLs (including those with query parameters)
+          const isUrl = /^https?:\/\/.+/i.test(v) && 
+                       (v.includes('cloudinary.com') || 
+                        v.includes('unsplash.com') || 
+                        v.includes('images.') ||
+                        /\.(jpg|jpeg|png|webp|gif)($|\?)/i.test(v));
           return isUrl;
         },
         message: 'Image URL must be a valid HTTP/HTTPS URL'

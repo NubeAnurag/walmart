@@ -21,4 +21,10 @@ router.get('/orders/:orderId', verifyToken, managerOrderController.getOrderDetai
 // Update order status (approve/reject by supplier)
 router.patch('/orders/:orderId/status', verifyToken, managerOrderController.updateOrderStatus);
 
+// Accept delivery (manager accepts received items)
+router.post('/orders/:orderId/delivery', verifyToken, managerOrderController.acceptDelivery);
+
+// Delete order (soft delete)
+router.delete('/orders/:orderId', verifyToken, managerOrderController.deleteOrder);
+
 module.exports = router; 

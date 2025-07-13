@@ -66,6 +66,14 @@ const loginValidation = (req, res, next) => {
     }),
     role: Joi.string().valid('customer', 'manager', 'staff', 'supplier', 'admin').optional().messages({
       'any.only': 'Role must be one of: customer, manager, staff, supplier, admin'
+    }),
+    staffType: Joi.string().valid('cashier', 'inventory').when('role', {
+      is: 'staff',
+      then: Joi.required().messages({
+        'any.required': 'Staff type is required for staff login',
+        'any.only': 'Staff type must be either cashier or inventory'
+      }),
+      otherwise: Joi.optional()
     })
   });
 

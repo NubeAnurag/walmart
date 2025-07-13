@@ -62,8 +62,44 @@ const WelcomeSection = () => {
           <div className="mb-8">
             <div className="flex items-center justify-center mb-6">
               <div className="relative">
-                <div className="w-20 h-20 bg-gradient-to-br from-walmart-blue to-walmart-lightblue rounded-2xl flex items-center justify-center shadow-2xl transform hover:scale-110 transition-transform duration-300">
-                  <ShoppingCart className="w-10 h-10 text-white" />
+                {/* Walmart Logo */}
+                <div className="w-32 h-20 bg-white rounded-2xl flex items-center justify-center shadow-2xl transform hover:scale-110 transition-transform duration-300 p-4">
+                  <svg 
+                    viewBox="0 0 200 80" 
+                    className="w-full h-full"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    {/* Walmart Text */}
+                    <text 
+                      x="20" 
+                      y="35" 
+                      fill="#0071ce" 
+                      fontSize="24" 
+                      fontWeight="bold" 
+                      fontFamily="Arial, sans-serif"
+                    >
+                      Walmart
+                    </text>
+                    
+                    {/* Walmart Spark/Star Icon */}
+                    <g transform="translate(150, 15)">
+                      <path 
+                        d="M25 5 L30 20 L45 20 L33 30 L38 45 L25 35 L12 45 L17 30 L5 20 L20 20 Z" 
+                        fill="#ffc220" 
+                        stroke="#ffc220" 
+                        strokeWidth="1"
+                      />
+                      <circle cx="25" cy="25" r="3" fill="#ffc220"/>
+                      <circle cx="15" cy="15" r="2" fill="#ffc220"/>
+                      <circle cx="35" cy="15" r="2" fill="#ffc220"/>
+                      <circle cx="15" cy="35" r="2" fill="#ffc220"/>
+                      <circle cx="35" cy="35" r="2" fill="#ffc220"/>
+                      <circle cx="25" cy="8" r="1.5" fill="#ffc220"/>
+                      <circle cx="25" cy="42" r="1.5" fill="#ffc220"/>
+                      <circle cx="8" cy="25" r="1.5" fill="#ffc220"/>
+                      <circle cx="42" cy="25" r="1.5" fill="#ffc220"/>
+                    </g>
+                  </svg>
                 </div>
                 <div className="absolute -top-2 -right-2 w-6 h-6 bg-walmart-yellow rounded-full flex items-center justify-center">
                   <Sparkles className="w-3 h-3 text-walmart-blue" />

@@ -176,7 +176,7 @@ export const AuthProvider = ({ children }) => {
         payload: displayMessage,
       });
       toast.error(displayMessage);
-      return { success: false, error: displayMessage };
+      return { success: false, error: displayMessage, errors: errorInfo.errors };
     } finally {
       dispatch({ type: AUTH_ACTIONS.SET_LOADING, payload: false });
     }
@@ -234,7 +234,12 @@ export const AuthProvider = ({ children }) => {
         type: AUTH_ACTIONS.SET_ERROR,
         payload: displayMessage,
       });
-      toast.error(displayMessage);
+      
+      // Only show toast for general errors, not field-specific ones
+      if (!errorInfo.errors || errorInfo.errors.length === 0) {
+        toast.error(displayMessage);
+      }
+      
       return { success: false, error: displayMessage, errors: errorInfo.errors };
     } finally {
       dispatch({ type: AUTH_ACTIONS.SET_LOADING, payload: false });

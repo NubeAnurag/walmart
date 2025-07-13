@@ -33,6 +33,25 @@ const managerOrderItemSchema = new mongoose.Schema({
     type: Number,
     required: true,
     min: 0.01
+  },
+  // Delivery verification fields
+  deliveredQuantity: {
+    type: Number,
+    min: 0,
+    default: 0,
+    validate: {
+      validator: Number.isInteger,
+      message: 'Delivered quantity must be a whole number'
+    }
+  },
+  isDelivered: {
+    type: Boolean,
+    default: false
+  },
+  deliveryNotes: {
+    type: String,
+    trim: true,
+    maxlength: 200
   }
 }, { _id: false });
 
@@ -103,7 +122,7 @@ const managerOrderSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['pending', 'approved', 'rejected', 'cancelled'],
+    enum: ['pending', 'approved', 'rejected', 'cancelled', 'delivered'],
     default: 'pending'
   },
   orderDate: {
@@ -123,6 +142,34 @@ const managerOrderSchema = new mongoose.Schema({
   },
   actualDeliveryDate: {
     type: Date
+  },
+  // Delivery acceptance fields
+  deliveryAcceptedDate: {
+    type: Date
+  },
+  deliveryAcceptedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
+  deliveryStatus: {
+    type: String,
+    enum: ['pending', 'partial', 'complete'],
+    default: 'pending'
+  },
+  deliveryNotes: {
+    type: String,
+    trim: true,
+    maxlength: 500
+  },
+  totalDeliveredItems: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  totalOrderedItems: {
+    type: Number,
+    default: 0,
+    min: 0
   },
   notes: {
     manager: { type: String, trim: true, maxlength: 500 },
@@ -166,9 +213,16 @@ managerOrderSchema.index({ expectedDeliveryDate: 1 });
 // Pre-save middleware to generate order number if not provided
 managerOrderSchema.pre('save', async function(next) {
   if (!this.orderNumber && this.isNew) {
-    const count = await this.constructor.countDocuments();
-    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    this.orderNumber = `MO-${dateStr}-${(count + 1).toString().padStart(4, '0')}`;
+    try {
+      const { generateUniqueOrderNumber } = require('../utils/orderNumberGenerator');
+      this.orderNumber = await generateUniqueOrderNumber();
+    } catch (error) {
+      console.error('Error generating order number:', error);
+      // Fallback to timestamp-based number
+      const timestamp = Date.now();
+      const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+      this.orderNumber = `MO-${dateStr}-${timestamp}`;
+    }
   }
   
   // Add timeline entry for status changes
@@ -183,10 +237,23 @@ managerOrderSchema.pre('save', async function(next) {
   next();
 });
 
-// Pre-save middleware to calculate total amount
+// Pre-save middleware to calculate total amount and delivery totals
 managerOrderSchema.pre('save', function(next) {
   if (this.items && this.items.length > 0) {
     this.totalAmount = this.items.reduce((total, item) => total + item.totalPrice, 0);
+    
+    // Calculate delivery totals
+    this.totalOrderedItems = this.items.reduce((total, item) => total + item.quantity, 0);
+    this.totalDeliveredItems = this.items.reduce((total, item) => total + (item.deliveredQuantity || 0), 0);
+    
+    // Update delivery status based on delivered quantities
+    if (this.totalDeliveredItems === 0) {
+      this.deliveryStatus = 'pending';
+    } else if (this.totalDeliveredItems < this.totalOrderedItems) {
+      this.deliveryStatus = 'partial';
+    } else {
+      this.deliveryStatus = 'complete';
+    }
   }
   next();
 });
@@ -269,6 +336,48 @@ managerOrderSchema.methods.updateStatus = function(newStatus, updatedBy, notes =
     updatedBy: updatedBy,
     notes: notes
   });
+  return this.save();
+};
+
+managerOrderSchema.methods.acceptDelivery = function(deliveryData, managerId) {
+  const { deliveredItems, deliveryDate, deliveryNotes } = deliveryData;
+  
+  // Update delivered quantities for each item
+  deliveredItems.forEach(deliveredItem => {
+    // Extract product ID string from productId (handle both string and object)
+    const productIdString = typeof deliveredItem.productId === 'string' 
+      ? deliveredItem.productId 
+      : deliveredItem.productId.id || deliveredItem.productId._id || deliveredItem.productId.toString();
+    
+    const orderItem = this.items.find(item => 
+      item.productId.toString() === productIdString
+    );
+    if (orderItem) {
+      orderItem.deliveredQuantity = deliveredItem.deliveredQuantity;
+      orderItem.isDelivered = deliveredItem.deliveredQuantity > 0;
+      orderItem.deliveryNotes = deliveredItem.deliveryNotes || '';
+    }
+  });
+  
+  // Set delivery acceptance details
+  this.deliveryAcceptedDate = deliveryDate || new Date();
+  this.deliveryAcceptedBy = managerId;
+  this.deliveryNotes = deliveryNotes || '';
+  
+  // Update order status to delivered if all items are delivered
+  const allItemsDelivered = this.items.every(item => item.isDelivered);
+  if (allItemsDelivered) {
+    this.status = 'delivered';
+    this.actualDeliveryDate = this.deliveryAcceptedDate;
+  }
+  
+  // Add timeline entry
+  this.timeline.push({
+    status: 'delivery_accepted',
+    updatedBy: managerId,
+    notes: `Delivery accepted. ${this.deliveryStatus === 'complete' ? 'All items' : 'Partial items'} received.`
+  });
+  
   return this.save();
 };
 

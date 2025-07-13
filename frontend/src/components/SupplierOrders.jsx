@@ -17,7 +17,8 @@ const SupplierOrders = () => {
   const [actionData, setActionData] = useState({
     orderId: '',
     status: '',
-    notes: ''
+    notes: '',
+    estimatedDeliveryDate: ''
   });
 
   useEffect(() => {
@@ -81,25 +82,46 @@ const SupplierOrders = () => {
     }
   };
 
-  const openActionModal = (orderId, currentStatus) => {
+  const openActionModal = (orderId, action) => {
+    // Get minimum date (tomorrow)
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const minDate = tomorrow.toISOString().split('T')[0];
+    
     setActionData({
       orderId: orderId,
-      status: currentStatus === 'pending' ? 'approved' : 'rejected',
-      notes: ''
+      status: action,
+      notes: '',
+      estimatedDeliveryDate: action === 'approved' ? minDate : ''
     });
     setShowActionModal(true);
   };
 
   const handleAction = async () => {
     try {
-      await supplierAPI.updateManagerOrderStatus(actionData.orderId, actionData.status, actionData.notes);
+      // Validate delivery date for approved orders
+      if (actionData.status === 'approved' && !actionData.estimatedDeliveryDate) {
+        alert('Please select an estimated delivery date for approved orders');
+        return;
+      }
+      
+      const requestData = {
+        status: actionData.status,
+        notes: actionData.notes
+      };
+      
+      if (actionData.status === 'approved') {
+        requestData.estimatedDeliveryDate = actionData.estimatedDeliveryDate;
+      }
+      
+      await supplierAPI.updateManagerOrderStatus(actionData.orderId, requestData);
       
       // Refresh orders
       await fetchOrders();
       
       // Close modal and reset
       setShowActionModal(false);
-      setActionData({ orderId: '', status: '', notes: '' });
+      setActionData({ orderId: '', status: '', notes: '', estimatedDeliveryDate: '' });
       
       alert(`Order ${actionData.status} successfully!`);
     } catch (err) {
@@ -245,13 +267,13 @@ const SupplierOrders = () => {
                     {order.status === 'pending' && (
                       <>
                         <button
-                          onClick={() => openActionModal(order.id, 'pending')}
+                          onClick={() => openActionModal(order.id, 'approved')}
                           className="text-green-600 hover:text-green-900"
                         >
                           Approve
                         </button>
                         <button
-                          onClick={() => openActionModal(order.id, 'pending')}
+                          onClick={() => openActionModal(order.id, 'rejected')}
                           className="text-red-600 hover:text-red-900"
                         >
                           Reject
@@ -374,7 +396,7 @@ const SupplierOrders = () => {
                 <button
                   onClick={() => {
                     setShowOrderDetails(false);
-                    openActionModal(selectedOrder.id, 'pending');
+                    openActionModal(selectedOrder.id, 'approved');
                   }}
                   className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
                 >
@@ -383,7 +405,7 @@ const SupplierOrders = () => {
                 <button
                   onClick={() => {
                     setShowOrderDetails(false);
-                    openActionModal(selectedOrder.id, 'pending');
+                    openActionModal(selectedOrder.id, 'rejected');
                   }}
                   className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
                 >
@@ -415,6 +437,19 @@ const SupplierOrders = () => {
                 />
               </div>
               
+              {actionData.status === 'approved' && (
+                <div>
+                  <label className="block text-sm font-medium mb-1">Estimated Delivery Date</label>
+                  <input
+                    type="date"
+                    value={actionData.estimatedDeliveryDate}
+                    onChange={(e) => setActionData({ ...actionData, estimatedDeliveryDate: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    min={actionData.estimatedDeliveryDate ? actionData.estimatedDeliveryDate : new Date().toISOString().split('T')[0]}
+                  />
+                </div>
+              )}
+
               <div className="flex space-x-4">
                 <button
                   onClick={handleAction}

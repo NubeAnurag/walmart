@@ -3,13 +3,14 @@ const Store = require('../models/Store');
 
 /**
  * Generate unique employee ID in format: EMP-<StoreCode>-<RoleCode>-<SequentialNumber>
- * Example: EMP-STR01-MGR-001, EMP-STR02-STF-005
+ * Example: EMP-STR01-MGR-001, EMP-STR02-CSH-005, EMP-STR02-INV-003
  * 
  * @param {string} storeId - MongoDB ObjectId of the store
  * @param {string} role - Employee role ('manager' or 'staff')
+ * @param {string} staffType - Staff type ('cashier' or 'inventory') - only for staff role
  * @returns {Promise<string>} Generated employee ID
  */
-const generateEmployeeId = async (storeId, role) => {
+const generateEmployeeId = async (storeId, role, staffType = null) => {
   try {
     // Get store information
     const store = await Store.findById(storeId);
@@ -18,7 +19,17 @@ const generateEmployeeId = async (storeId, role) => {
     }
 
     // Get role code
-    const roleCode = role === 'manager' ? 'MGR' : 'STF';
+    let roleCode;
+    if (role === 'manager') {
+      roleCode = 'MGR';
+    } else if (role === 'staff') {
+      if (!staffType) {
+        throw new Error('Staff type is required for staff role');
+      }
+      roleCode = staffType === 'cashier' ? 'CSH' : 'INV';
+    } else {
+      throw new Error('Invalid role for employee ID generation');
+    }
     
     // Find the highest sequential number for this store and role
     const pattern = `^EMP-${store.storeCode}-${roleCode}-`;

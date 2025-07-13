@@ -76,13 +76,48 @@ const HomePage = () => {
         <header className="bg-white shadow-sm border-b border-gray-200">
           <div className="max-w-7xl mx-auto px-4 py-4">
             <div className="flex justify-between items-center">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-walmart-blue to-walmart-lightblue rounded-full flex items-center justify-center">
-                  <User className="w-5 h-5 text-white" />
+              <div className="flex items-center space-x-4">
+                {/* Walmart Logo */}
+                <div className="w-24 h-12 bg-white rounded-lg flex items-center justify-center p-2">
+                  <svg 
+                    viewBox="0 0 200 80" 
+                    className="w-full h-full"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <text 
+                      x="20" 
+                      y="35" 
+                      fill="#0071ce" 
+                      fontSize="20" 
+                      fontWeight="bold" 
+                      fontFamily="Arial, sans-serif"
+                    >
+                      Walmart
+                    </text>
+                    <g transform="translate(150, 15)">
+                      <path 
+                        d="M25 5 L30 20 L45 20 L33 30 L38 45 L25 35 L12 45 L17 30 L5 20 L20 20 Z" 
+                        fill="#ffc220" 
+                        stroke="#ffc220" 
+                        strokeWidth="1"
+                      />
+                      <circle cx="25" cy="25" r="2" fill="#ffc220"/>
+                      <circle cx="15" cy="15" r="1.5" fill="#ffc220"/>
+                      <circle cx="35" cy="15" r="1.5" fill="#ffc220"/>
+                      <circle cx="15" cy="35" r="1.5" fill="#ffc220"/>
+                      <circle cx="35" cy="35" r="1.5" fill="#ffc220"/>
+                    </g>
+                  </svg>
                 </div>
-                <div>
-                  <p className="text-sm text-gray-600">Welcome back,</p>
-                  <p className="font-semibold text-gray-900">{user.firstName} {user.lastName}</p>
+                
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-gradient-to-br from-walmart-blue to-walmart-lightblue rounded-full flex items-center justify-center">
+                    <User className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Welcome back,</p>
+                    <p className="font-semibold text-gray-900">{user.firstName} {user.lastName}</p>
+                  </div>
                 </div>
               </div>
               <div className="flex items-center space-x-4">

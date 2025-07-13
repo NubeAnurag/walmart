@@ -150,7 +150,7 @@ const generateSalesReport = async (req, res) => {
       const paymentMethodData = await Sale.aggregate([
         {
           $match: {
-            storeId: mongoose.Types.ObjectId(storeId),
+            storeId: new mongoose.Types.ObjectId(storeId),
             saleDate: { $gte: start, $lte: end },
             status: { $ne: 'cancelled' }
           }
@@ -280,7 +280,7 @@ const generateInventoryReport = async (req, res) => {
 
       // Get inventory overview
       const overview = await Inventory.aggregate([
-        { $match: { storeId: mongoose.Types.ObjectId(storeId) } },
+        { $match: { storeId: new mongoose.Types.ObjectId(storeId) } },
         {
           $lookup: {
             from: 'products',
@@ -312,7 +312,7 @@ const generateInventoryReport = async (req, res) => {
 
       // Get category breakdown
       const categoryBreakdown = await Inventory.aggregate([
-        { $match: { storeId: mongoose.Types.ObjectId(storeId) } },
+        { $match: { storeId: new mongoose.Types.ObjectId(storeId) } },
         {
           $lookup: {
             from: 'products',
@@ -444,7 +444,7 @@ const generateStaffReport = async (req, res) => {
       const startTime = Date.now();
 
       // Build match conditions
-      let matchConditions = { storeId: mongoose.Types.ObjectId(storeId), isActive: true };
+      let matchConditions = { storeId: new mongoose.Types.ObjectId(storeId), isActive: true };
       if (department) matchConditions.department = department;
 
       // Get staff overview
@@ -477,7 +477,7 @@ const generateStaffReport = async (req, res) => {
 
       // Get department breakdown
       const departmentBreakdown = await StaffProfile.aggregate([
-        { $match: { storeId: mongoose.Types.ObjectId(storeId), isActive: true } },
+        { $match: { storeId: new mongoose.Types.ObjectId(storeId), isActive: true } },
         {
           $group: {
             _id: '$department',

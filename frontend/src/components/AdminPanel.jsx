@@ -41,7 +41,8 @@ const AdminPanel = () => {
     role: 'staff',
     storeId: '',
     phone: '',
-    password: ''
+    password: '',
+    staffType: ''
   });
   const [createEmployeeLoading, setCreateEmployeeLoading] = useState(false);
   const [generatedPassword, setGeneratedPassword] = useState('');
@@ -137,7 +138,8 @@ const AdminPanel = () => {
           role: 'staff',
           storeId: '',
           phone: '',
-          password: ''
+          password: '',
+          staffType: ''
         });
         // Refresh data
         loadDashboardStats();
@@ -476,7 +478,8 @@ const AdminPanel = () => {
                     value={createEmployeeForm.role}
                     onChange={(e) => setCreateEmployeeForm({
                       ...createEmployeeForm,
-                      role: e.target.value
+                      role: e.target.value,
+                      staffType: '' // Reset staff type when role changes
                     })}
                     className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-walmart-blue focus:border-transparent"
                     required
@@ -485,6 +488,28 @@ const AdminPanel = () => {
                     <option value="manager">Manager</option>
                   </select>
                 </div>
+
+                {/* Staff Type Field - Only show for staff role */}
+                {createEmployeeForm.role === 'staff' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Staff Type *
+                    </label>
+                    <select
+                      value={createEmployeeForm.staffType}
+                      onChange={(e) => setCreateEmployeeForm({
+                        ...createEmployeeForm,
+                        staffType: e.target.value
+                      })}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-walmart-blue focus:border-transparent"
+                      required
+                    >
+                      <option value="">Select Staff Type</option>
+                      <option value="cashier">Cashier</option>
+                      <option value="inventory">Inventory</option>
+                    </select>
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -621,13 +646,24 @@ const AdminPanel = () => {
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                            employee.role === 'manager' 
-                              ? 'bg-green-100 text-green-800' 
-                              : 'bg-purple-100 text-purple-800'
-                          }`}>
-                            {employee.role === 'manager' ? 'Manager' : 'Staff'}
-                          </span>
+                          <div className="flex flex-col space-y-1">
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                              employee.role === 'manager' 
+                                ? 'bg-green-100 text-green-800' 
+                                : 'bg-purple-100 text-purple-800'
+                            }`}>
+                              {employee.role === 'manager' ? 'Manager' : 'Staff'}
+                            </span>
+                            {employee.role === 'staff' && employee.staffType && (
+                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                employee.staffType === 'cashier' 
+                                  ? 'bg-blue-100 text-blue-800' 
+                                  : 'bg-orange-100 text-orange-800'
+                              }`}>
+                                {employee.staffType === 'cashier' ? 'Cashier' : 'Inventory'}
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           {employee.storeId ? (
@@ -725,6 +761,11 @@ const AdminPanel = () => {
                               </div>
                               <div className="text-xs text-gray-400">
                                 {employee.role === 'manager' ? 'Manager' : 'Staff'}
+                                {employee.role === 'staff' && employee.staffType && (
+                                  <span className="ml-1">
+                                    • {employee.staffType === 'cashier' ? 'Cashier' : 'Inventory'}
+                                  </span>
+                                )}
                               </div>
                             </div>
                           </div>

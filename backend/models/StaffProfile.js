@@ -18,6 +18,17 @@ const staffProfileSchema = new mongoose.Schema({
     unique: true,
     trim: true
   },
+  staffType: {
+    type: String,
+    required: true,
+    enum: ['cashier', 'inventory'],
+    validate: {
+      validator: function(v) {
+        return ['cashier', 'inventory'].includes(v);
+      },
+      message: 'Staff type must be either cashier or inventory'
+    }
+  },
   position: {
     type: String,
     required: true,
