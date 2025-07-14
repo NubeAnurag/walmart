@@ -7,11 +7,6 @@
   "env": {
     "NODE_ENV": "production"
   },
-  "functions": {
-    "frontend/**/*.js": {
-      "maxDuration": 10
-    }
-  },
   "routes": [
     {
       "src": "/static/(.*)",
