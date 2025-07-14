@@ -9,6 +9,7 @@ const {
   getCustomerOrders,
   downloadReceipt
 } = require('../controllers/customerController');
+const { getStoreInventory } = require('../controllers/inventoryController');
 
 // Middleware to ensure only customers can access these routes
 const customerAuth = (req, res, next) => {
@@ -38,5 +39,8 @@ router.get('/orders', getCustomerOrders);
 
 // Receipt routes
 router.get('/receipt/:saleId', downloadReceipt);
+
+// Add inventory route for customers
+router.get('/inventory/:storeId', getStoreInventory);
 
 module.exports = router; 

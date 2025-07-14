@@ -13,16 +13,17 @@ import {
   User,
   LogOut,
   Package,
+  Phone,
   Star,
   ShoppingBag,
   CreditCard,
   CheckCircle,
   AlertCircle,
-  X
+  X,
+  Mail
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { customerAPI } from '../services/api';
-import { toast } from 'react-toastify';
 
 const CustomerDashboard = () => {
   const { user, logout } = useAuth();
@@ -33,7 +34,7 @@ const CustomerDashboard = () => {
   const [cart, setCart] = useState([]);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [currentView, setCurrentView] = useState('store-selection'); // store-selection, products, cart, orders
+  const [currentView, setCurrentView] = useState('dashboard'); // dashboard, store-selection, products, cart, orders, account
   const [viewMode, setViewMode] = useState('grid');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -42,6 +43,16 @@ const CustomerDashboard = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [showCheckout, setShowCheckout] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState(null);
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [showReceipt, setShowReceipt] = useState(false);
+  const [receiptData, setReceiptData] = useState(null);
+  const [profileData, setProfileData] = useState({
+    firstName: user?.firstName || '',
+    lastName: user?.lastName || '',
+    email: user?.email || '',
+    phone: user?.phone || ''
+  });
+  const [storeInventoryCounts, setStoreInventoryCounts] = useState({});
 
   // Load stores on component mount
   useEffect(() => {
@@ -55,9 +66,9 @@ const CustomerDashboard = () => {
     }
   }, [selectedStore, currentView, searchTerm, selectedCategory, sortBy, currentPage]);
 
-  // Load orders when orders view is selected
+  // Load orders when orders view or dashboard is selected
   useEffect(() => {
-    if (currentView === 'orders') {
+    if (currentView === 'orders' || currentView === 'dashboard') {
       loadOrders();
     }
   }, [currentView]);
@@ -69,38 +80,87 @@ const CustomerDashboard = () => {
       const response = await customerAPI.getStores();
       if (response.success) {
         setStores(response.data);
+        // Load inventory counts for all stores
+        loadStoreInventoryCounts(response.data);
       }
     } catch (error) {
       console.error('Error loading stores:', error);
-      toast.error('Failed to load stores');
+      alert('Failed to load stores');
     } finally {
       setLoading(false);
     }
   };
 
+  // Load inventory counts for all stores
+  const loadStoreInventoryCounts = async (storeList) => {
+    const counts = {};
+    for (const store of storeList) {
+      try {
+        const response = await customerAPI.getStoreInventory(store._id || store.id);
+        if (response.success) {
+          counts[store._id || store.id] = response.data.inventory.length;
+        } else {
+          counts[store._id || store.id] = 0;
+        }
+      } catch (error) {
+        console.error(`Error loading inventory for store ${store.storeCode}:`, error);
+        counts[store._id || store.id] = 0;
+      }
+    }
+    setStoreInventoryCounts(counts);
+  };
+
   // Load products for selected store
   const loadProducts = async () => {
     if (!selectedStore) return;
-    
     try {
       setLoading(true);
-      const params = {
-        page: currentPage,
-        limit: 20,
-        sort: sortBy,
-        ...(searchTerm && { search: searchTerm }),
-        ...(selectedCategory !== 'all' && { category: selectedCategory })
-      };
       
-      const response = await customerAPI.getStoreProducts(selectedStore.id, params);
+      // Debug: Log the selectedStore object
+      console.log('🏪 Selected store object:', selectedStore);
+      console.log('🏪 Selected store._id:', selectedStore._id);
+      console.log('🏪 Selected store.id:', selectedStore.id);
+      
+      // Extract store ID properly
+      const storeId = selectedStore._id || selectedStore.id;
+      console.log('🏪 Extracted storeId:', storeId);
+      
+      if (!storeId) {
+        console.error('❌ No valid store ID found');
+        alert('Invalid store selected. Please select a store again.');
+        return;
+      }
+      
+      const response = await customerAPI.getStoreInventory(storeId);
+      console.log('📦 Inventory response:', response);
+      
       if (response.success) {
-        setProducts(response.data.products);
-        setCategories(response.data.categories);
-        setTotalPages(response.data.pagination.totalPages);
+        // Map inventory to product objects with stock count
+        const inventoryProducts = response.data.inventory.map(item => ({
+          ...item.productId,
+          stock: item.quantity
+        }));
+        console.log('📦 Processed inventory products:', inventoryProducts);
+        
+        if (inventoryProducts.length === 0) {
+          console.log('📦 No inventory found for this store');
+          setProducts([]);
+          alert(`No products available in ${selectedStore.name} (${selectedStore.storeCode}). Please try another store.`);
+        } else {
+          setProducts(inventoryProducts);
+        }
+        
+        // Optionally, extract categories from products
+        const uniqueCategories = Array.from(new Set(inventoryProducts.map(p => p.category).filter(Boolean)));
+        setCategories(uniqueCategories);
+        setTotalPages(1); // No pagination for now
+      } else {
+        console.error('❌ Failed to load inventory:', response.message);
+        alert('Failed to load products: ' + (response.message || 'Unknown error'));
       }
     } catch (error) {
       console.error('Error loading products:', error);
-      toast.error('Failed to load products');
+      alert('Failed to load products: ' + (error.response?.data?.message || error.message));
     } finally {
       setLoading(false);
     }
@@ -116,7 +176,7 @@ const CustomerDashboard = () => {
       }
     } catch (error) {
       console.error('Error loading orders:', error);
-      toast.error('Failed to load orders');
+      alert('Failed to load orders');
     } finally {
       setLoading(false);
     }
@@ -124,6 +184,11 @@ const CustomerDashboard = () => {
 
   // Select store
   const handleStoreSelect = (store) => {
+    console.log('🏪 Store selected:', store);
+    console.log('🏪 Store keys:', Object.keys(store));
+    console.log('🏪 Store._id:', store._id);
+    console.log('🏪 Store.id:', store.id);
+    
     setSelectedStore(store);
     setCurrentView('products');
     setCurrentPage(1);
@@ -134,17 +199,17 @@ const CustomerDashboard = () => {
 
   // Add to cart
   const addToCart = (product) => {
-    const existingItem = cart.find(item => item.id === product.id);
+    const existingItem = cart.find(item => (item._id || item.id) === (product._id || product.id));
     if (existingItem) {
       setCart(cart.map(item =>
-        item.id === product.id
+        (item._id || item.id) === (product._id || product.id)
           ? { ...item, quantity: item.quantity + 1 }
           : item
       ));
     } else {
       setCart([...cart, { ...product, quantity: 1 }]);
     }
-    toast.success(`${product.name} added to cart`);
+    alert(`${product.name} added to cart`);
   };
 
   // Update cart quantity
@@ -154,7 +219,7 @@ const CustomerDashboard = () => {
       return;
     }
     setCart(cart.map(item =>
-      item.id === productId
+      (item._id || item.id) === productId
         ? { ...item, quantity: newQuantity }
         : item
     ));
@@ -162,7 +227,7 @@ const CustomerDashboard = () => {
 
   // Remove from cart
   const removeFromCart = (productId) => {
-    setCart(cart.filter(item => item.id !== productId));
+    setCart(cart.filter(item => (item._id || item.id) !== productId));
   };
 
   // Calculate cart total
@@ -173,16 +238,16 @@ const CustomerDashboard = () => {
   // Place order
   const placeOrder = async () => {
     if (cart.length === 0) {
-      toast.error('Cart is empty');
+      alert('Cart is empty');
       return;
     }
 
     try {
       setLoading(true);
       const orderData = {
-        storeId: selectedStore.id,
+        storeId: selectedStore._id || selectedStore.id,
         items: cart.map(item => ({
-          productId: item.id,
+          productId: item._id || item.id,
           quantity: item.quantity
         })),
         customerInfo: {
@@ -198,17 +263,51 @@ const CustomerDashboard = () => {
         setOrderSuccess(response.data);
         setCart([]);
         setShowCheckout(false);
-        toast.success('Order placed successfully!');
+        
+        // Show success message with receipt display option
+        const showReceipt = window.confirm(
+          `Order placed successfully!\n\nTransaction ID: ${response.data.transactionId}\nTotal Amount: $${response.data.totalAmount}\n\nWould you like to view the receipt?`
+        );
+        
+        if (showReceipt) {
+          try {
+            await displayReceipt(response.data.sale._id || response.data.sale.id);
+          } catch (error) {
+            console.error('Error displaying receipt:', error);
+            alert('Receipt display failed, but order was placed successfully!');
+          }
+        }
       }
     } catch (error) {
       console.error('Error placing order:', error);
-      toast.error(error.response?.data?.message || 'Failed to place order');
+      alert(error.response?.data?.message || 'Failed to place order');
     } finally {
       setLoading(false);
     }
   };
 
-  // Download receipt
+  // Display receipt
+  const displayReceipt = async (saleId) => {
+    try {
+      const response = await customerAPI.downloadReceipt(saleId, 'pdf');
+      
+      // Create blob URL for display
+      const blob = new Blob([response.data], { type: response.headers['content-type'] });
+      const url = window.URL.createObjectURL(blob);
+      
+      setReceiptData({
+        url,
+        saleId,
+        blob
+      });
+      setShowReceipt(true);
+    } catch (error) {
+      console.error('Error displaying receipt:', error);
+      alert('Failed to display receipt');
+    }
+  };
+
+  // Download receipt (for manual download option)
   const downloadReceipt = async (saleId, format = 'pdf') => {
     try {
       const response = await customerAPI.downloadReceipt(saleId, format);
@@ -231,12 +330,291 @@ const CustomerDashboard = () => {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
       
-      toast.success('Receipt downloaded successfully');
+      alert('Receipt downloaded successfully');
     } catch (error) {
       console.error('Error downloading receipt:', error);
-      toast.error('Failed to download receipt');
+      alert('Failed to download receipt');
     }
   };
+
+  // Update profile
+  const updateProfile = async () => {
+    try {
+      setLoading(true);
+      // This would call the API to update profile
+      // const response = await customerAPI.updateProfile(profileData);
+      alert('Profile updated successfully!');
+      setEditingProfile(false);
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      alert('Failed to update profile');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Render dashboard overview
+  const renderDashboard = () => (
+    <div className="space-y-6">
+      {/* Welcome Section */}
+      <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl p-6 text-white">
+        <h2 className="text-2xl font-bold mb-2">Welcome back, {user.firstName}!</h2>
+        <p className="text-blue-100">Ready to start shopping? Select a store below or browse your recent orders.</p>
+      </div>
+
+      {/* Quick Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-white rounded-lg shadow-sm p-6">
+          <div className="flex items-center">
+            <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+              <ShoppingBag className="w-6 h-6 text-green-600" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm text-gray-600">Total Orders</p>
+              <p className="text-2xl font-bold text-gray-900">{orders.length}</p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-white rounded-lg shadow-sm p-6">
+          <div className="flex items-center">
+            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+              <Store className="w-6 h-6 text-blue-600" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm text-gray-600">Available Stores</p>
+              <p className="text-2xl font-bold text-gray-900">{stores.length}</p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-white rounded-lg shadow-sm p-6">
+          <div className="flex items-center">
+            <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+              <ShoppingCart className="w-6 h-6 text-purple-600" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm text-gray-600">Items in Cart</p>
+              <p className="text-2xl font-bold text-gray-900">{cart.length}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Store Selection */}
+      <div className="bg-white rounded-lg shadow-sm p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Select a Store to Start Shopping</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {loading ? (
+            <div className="col-span-full flex justify-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+          ) : (
+            stores.slice(0, 6).map((store) => {
+              const inventoryCount = storeInventoryCounts[store._id || store.id] || 0;
+              return (
+                <div
+                  key={store._id}
+                  onClick={() => handleStoreSelect(store)}
+                  className={`border border-gray-200 rounded-lg p-4 cursor-pointer hover:border-blue-500 hover:shadow-md transition-all ${
+                    inventoryCount === 0 ? 'opacity-60' : ''
+                  }`}
+                >
+                  <div className="flex items-center mb-2">
+                    <Store className="h-5 w-5 text-blue-600 mr-2" />
+                    <h4 className="font-medium text-gray-900">{store.name}</h4>
+                  </div>
+                  <p className="text-sm text-gray-600 mb-1">{store.storeCode}</p>
+                  <p className="text-xs text-gray-500 mb-2">{store.address}</p>
+                  <div className="flex items-center justify-between">
+                    <span className={`text-xs px-2 py-1 rounded-full ${
+                      inventoryCount > 0 
+                        ? 'bg-green-100 text-green-800' 
+                        : 'bg-gray-100 text-gray-600'
+                    }`}>
+                      {inventoryCount > 0 ? `${inventoryCount} products` : 'No inventory'}
+                    </span>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+        {stores.length > 6 && (
+          <div className="mt-4 text-center">
+            <button
+              onClick={() => setCurrentView('store-selection')}
+              className="text-blue-600 hover:text-blue-800 font-medium"
+            >
+              View All {stores.length} Stores →
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Recent Orders */}
+      {orders.length > 0 && (
+        <div className="bg-white rounded-lg shadow-sm p-6">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">Recent Orders</h3>
+            <button
+              onClick={() => setCurrentView('orders')}
+              className="text-blue-600 hover:text-blue-800 font-medium"
+            >
+              View All →
+            </button>
+          </div>
+          <div className="space-y-3">
+            {orders.slice(0, 3).map((order) => (
+              <div key={order._id} className="flex justify-between items-center p-3 border border-gray-200 rounded-lg">
+                <div>
+                  <p className="font-medium text-gray-900">Order #{order.transactionId}</p>
+                  <p className="text-sm text-gray-600">{new Date(order.saleDate).toLocaleDateString()}</p>
+                </div>
+                <div className="text-right">
+                  <p className="font-bold text-green-600">${order.totalAmount.toFixed(2)}</p>
+                  <span className={`inline-block px-2 py-1 rounded-full text-xs ${
+                    order.status === 'completed' 
+                      ? 'bg-green-100 text-green-800'
+                      : 'bg-yellow-100 text-yellow-800'
+                  }`}>
+                    {order.status}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  // Render account settings
+  const renderAccountSettings = () => (
+    <div className="space-y-6">
+      <h2 className="text-2xl font-bold text-gray-900">Account Settings</h2>
+      
+      {/* Profile Information */}
+      <div className="bg-white rounded-lg shadow-sm p-6">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">Profile Information</h3>
+          <button
+            onClick={() => setEditingProfile(!editingProfile)}
+            className="text-blue-600 hover:text-blue-800 font-medium"
+          >
+            {editingProfile ? 'Cancel' : 'Edit Profile'}
+          </button>
+        </div>
+        
+        {editingProfile ? (
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+                <input
+                  type="text"
+                  value={profileData.firstName}
+                  onChange={(e) => setProfileData({...profileData, firstName: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+                <input
+                  type="text"
+                  value={profileData.lastName}
+                  onChange={(e) => setProfileData({...profileData, lastName: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+              <input
+                type="email"
+                value={profileData.email}
+                onChange={(e) => setProfileData({...profileData, email: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+              <input
+                type="tel"
+                value={profileData.phone}
+                onChange={(e) => setProfileData({...profileData, phone: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            <div className="flex space-x-4">
+              <button
+                onClick={updateProfile}
+                disabled={loading}
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              >
+                {loading ? 'Saving...' : 'Save Changes'}
+              </button>
+              <button
+                onClick={() => setEditingProfile(false)}
+                className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="flex items-center">
+              <User className="w-5 h-5 text-gray-400 mr-3" />
+              <div>
+                <p className="font-medium text-gray-900">{user.firstName} {user.lastName}</p>
+                <p className="text-sm text-gray-600">Full Name</p>
+              </div>
+            </div>
+            <div className="flex items-center">
+              <Mail className="w-5 h-5 text-gray-400 mr-3" />
+              <div>
+                <p className="font-medium text-gray-900">{user.email}</p>
+                <p className="text-sm text-gray-600">Email Address</p>
+              </div>
+            </div>
+            <div className="flex items-center">
+              <Phone className="w-5 h-5 text-gray-400 mr-3" />
+              <div>
+                <p className="font-medium text-gray-900">{user.phone || 'Not provided'}</p>
+                <p className="text-sm text-gray-600">Phone Number</p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Account Statistics */}
+      <div className="bg-white rounded-lg shadow-sm p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Account Statistics</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <p className="text-sm text-gray-600">Member Since</p>
+            <p className="font-medium text-gray-900">{new Date(user.createdAt).toLocaleDateString()}</p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-600">Total Orders</p>
+            <p className="font-medium text-gray-900">{orders.length}</p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-600">Account Status</p>
+            <span className="inline-block px-2 py-1 bg-green-100 text-green-800 rounded-full text-sm">
+              Active
+            </span>
+          </div>
+          <div>
+            <p className="text-sm text-gray-600">Customer Type</p>
+            <p className="font-medium text-gray-900">Regular Customer</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 
   // Render store selection
   const renderStoreSelection = () => (
@@ -252,23 +630,37 @@ const CustomerDashboard = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {stores.map((store) => (
-            <div
-              key={store.id}
-              onClick={() => handleStoreSelect(store)}
-              className="bg-white rounded-lg shadow-md p-6 cursor-pointer hover:shadow-lg transition-shadow border-2 border-transparent hover:border-blue-500"
-            >
-              <div className="flex items-center mb-4">
-                <Store className="h-8 w-8 text-blue-600 mr-3" />
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">{store.name}</h3>
-                  <p className="text-sm text-gray-600">{store.storeCode}</p>
+          {stores.map((store) => {
+            const inventoryCount = storeInventoryCounts[store._id || store.id] || 0;
+            return (
+              <div
+                key={store._id || store.id}
+                onClick={() => handleStoreSelect(store)}
+                className={`bg-white rounded-lg shadow-md p-6 cursor-pointer hover:shadow-lg transition-shadow border-2 border-transparent hover:border-blue-500 ${
+                  inventoryCount === 0 ? 'opacity-60' : ''
+                }`}
+              >
+                <div className="flex items-center mb-4">
+                  <Store className="h-8 w-8 text-blue-600 mr-3" />
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">{store.name}</h3>
+                    <p className="text-sm text-gray-600">{store.storeCode}</p>
+                  </div>
+                </div>
+                <p className="text-gray-700 mb-2">{store.address}</p>
+                <p className="text-gray-600 mb-3">{store.phone}</p>
+                <div className="flex justify-between items-center">
+                  <span className={`text-sm px-3 py-1 rounded-full ${
+                    inventoryCount > 0 
+                      ? 'bg-green-100 text-green-800' 
+                      : 'bg-gray-100 text-gray-600'
+                  }`}>
+                    {inventoryCount > 0 ? `${inventoryCount} products available` : 'No inventory'}
+                  </span>
                 </div>
               </div>
-              <p className="text-gray-700 mb-2">{store.address}</p>
-              <p className="text-gray-600">{store.phone}</p>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
@@ -369,7 +761,7 @@ const CustomerDashboard = () => {
         }>
           {products.map((product) => (
             <div
-              key={product.id}
+              key={product._id || product.id}
               className={`bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow ${
                 viewMode === 'list' ? 'flex' : ''
               }`}
@@ -599,11 +991,53 @@ const CustomerDashboard = () => {
                 </div>
               </div>
             ))}
+                  </div>
+      )}
+
+      {/* Receipt Modal */}
+      {showReceipt && receiptData && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg max-w-4xl w-full mx-4 h-5/6 flex flex-col">
+            {/* Header */}
+            <div className="flex justify-between items-center p-4 border-b">
+              <h3 className="text-lg font-semibold">Receipt</h3>
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => downloadReceipt(receiptData.saleId)}
+                  className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-sm flex items-center"
+                >
+                  <Download className="h-4 w-4 mr-1" />
+                  Download
+                </button>
+                <button
+                  onClick={() => {
+                    setShowReceipt(false);
+                    setReceiptData(null);
+                    if (receiptData.url) {
+                      window.URL.revokeObjectURL(receiptData.url);
+                    }
+                  }}
+                  className="px-3 py-1 bg-gray-600 text-white rounded hover:bg-gray-700 text-sm"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+            
+            {/* PDF Viewer */}
+            <div className="flex-1 p-4">
+              <iframe
+                src={receiptData.url}
+                className="w-full h-full border rounded"
+                title="Receipt PDF"
+              />
+            </div>
           </div>
-        )}
-      </div>
-    );
-  };
+        </div>
+      )}
+    </div>
+  );
+};
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -618,6 +1052,16 @@ const CustomerDashboard = () => {
             
             <div className="flex items-center space-x-4">
               <nav className="flex space-x-4">
+                <button
+                  onClick={() => setCurrentView('dashboard')}
+                  className={`px-4 py-2 rounded-lg ${
+                    currentView === 'dashboard' 
+                      ? 'bg-blue-600 text-white' 
+                      : 'text-gray-600 hover:text-blue-600'
+                  }`}
+                >
+                  Dashboard
+                </button>
                 <button
                   onClick={() => setCurrentView('store-selection')}
                   className={`px-4 py-2 rounded-lg ${
@@ -665,6 +1109,16 @@ const CustomerDashboard = () => {
                 >
                   Orders
                 </button>
+                <button
+                  onClick={() => setCurrentView('account')}
+                  className={`px-4 py-2 rounded-lg ${
+                    currentView === 'account' 
+                      ? 'bg-blue-600 text-white' 
+                      : 'text-gray-600 hover:text-blue-600'
+                  }`}
+                >
+                  Account
+                </button>
               </nav>
               
               <div className="flex items-center space-x-2">
@@ -684,10 +1138,12 @@ const CustomerDashboard = () => {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {currentView === 'dashboard' && renderDashboard()}
         {currentView === 'store-selection' && renderStoreSelection()}
         {currentView === 'products' && renderProducts()}
         {currentView === 'cart' && renderCart()}
         {currentView === 'orders' && renderOrders()}
+        {currentView === 'account' && renderAccountSettings()}
       </div>
 
       {/* Checkout Modal */}
@@ -761,8 +1217,15 @@ const CustomerDashboard = () => {
               
               <div className="space-y-3">
                 <button
-                  onClick={() => downloadReceipt(orderSuccess.sale._id)}
+                  onClick={() => displayReceipt(orderSuccess.sale._id || orderSuccess.sale.id)}
                   className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center justify-center"
+                >
+                  <Receipt className="h-4 w-4 mr-2" />
+                  View Receipt
+                </button>
+                <button
+                  onClick={() => downloadReceipt(orderSuccess.sale._id || orderSuccess.sale.id)}
+                  className="w-full bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center justify-center"
                 >
                   <Download className="h-4 w-4 mr-2" />
                   Download Receipt

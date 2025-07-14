@@ -176,6 +176,54 @@ export const supplierAPI = {
   },
 };
 
+// Customer API functions
+export const customerAPI = {
+  // Stores
+  getStores: async () => {
+    const response = await api.get('/customer/stores');
+    return response.data;
+  },
+
+  // Products
+  getStoreProducts: async (storeId, params = {}) => {
+    const response = await api.get(`/customer/stores/${storeId}/products`, { params });
+    return response.data;
+  },
+
+  getProductDetails: async (productId, storeId) => {
+    const response = await api.get(`/customer/products/${productId}`, { 
+      params: { storeId } 
+    });
+    return response.data;
+  },
+
+  // Orders
+  createOrder: async (orderData) => {
+    const response = await api.post('/customer/orders', orderData);
+    return response.data;
+  },
+
+  getOrders: async () => {
+    const response = await api.get('/customer/orders');
+    return response.data;
+  },
+
+  // Receipts
+  downloadReceipt: async (saleId, format = 'pdf') => {
+    const response = await api.get(`/customer/receipt/${saleId}`, {
+      params: { format },
+      responseType: 'blob'
+    });
+    return response;
+  },
+
+  // Inventory
+  getStoreInventory: async (storeId) => {
+    const response = await api.get(`/customer/inventory/${storeId}`);
+    return response.data;
+  },
+};
+
 // Manager API functions
 export const managerAPI = {
   // Suppliers

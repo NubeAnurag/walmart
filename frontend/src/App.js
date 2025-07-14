@@ -9,9 +9,11 @@ import AdminLoginPage from './pages/AdminLoginPage';
 import ManagerLoginPage from './pages/ManagerLoginPage';
 import StaffLoginPage from './pages/StaffLoginPage';
 import SupplierLoginPage from './pages/SupplierLoginPage';
+import CustomerLoginPage from './pages/CustomerLoginPage';
 import ManagerDashboard from './components/ManagerDashboard';
 import SupplierDashboard from './components/SupplierDashboard';
 import StaffDashboard from './components/StaffDashboard';
+import CustomerDashboard from './components/CustomerDashboard';
 import './index.css';
 
 // Protected Route Component
@@ -63,34 +65,7 @@ const PublicRoute = ({ children, allowAuthenticated = false }) => {
   return children;
 };
 
-// Placeholder Dashboard Components
-const CustomerDashboard = () => {
-  const { user, logout } = useAuth();
-  
-  return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold text-gray-800">Customer Dashboard</h1>
-          <button 
-            onClick={logout}
-            className="btn btn-secondary"
-          >
-            Logout
-          </button>
-        </div>
-        <div className="bg-white rounded-lg shadow p-6">
-          <p className="text-gray-600">Welcome, {user.firstName} {user.lastName}! 🛒</p>
-          <p className="text-sm text-walmart-blue font-medium mb-2">Role: Customer</p>
-          <p className="text-sm text-gray-500 mt-2">
-            Phase 1 Complete: Authentication System ✅<br/>
-            Coming Soon: QR Code Shopping, Barcode Scanning, Digital Cart
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-  };
+
   
 // StaffDashboard is now imported from components
 
@@ -172,6 +147,14 @@ function App() {
               element={
                 <PublicRoute>
                   <SupplierLoginPage />
+                </PublicRoute>
+              } 
+            />
+            <Route 
+              path="/login/customer" 
+              element={
+                <PublicRoute>
+                  <CustomerLoginPage />
                 </PublicRoute>
               } 
             />

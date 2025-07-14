@@ -110,11 +110,11 @@ const checkStaffData = async () => {
     }
 
     // Check for specific manager and their store
-    console.log('\n🔍 Checking for Manas Adhikari (manager) and his store...\n');
+    console.log('\n🔍 Checking for Anurag (manager) and his store...\n');
     const manager = await User.findOne({ 
       $or: [
-        { firstName: /manas/i, lastName: /adhikari/i },
-        { email: /manas/i }
+        { firstName: /anurag/i, lastName: /adhikari/i },
+        { email: /anurag12@gmail.com/i }
       ],
       role: 'manager',
       isActive: true

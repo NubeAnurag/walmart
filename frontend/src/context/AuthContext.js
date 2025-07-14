@@ -141,20 +141,34 @@ export const AuthProvider = ({ children }) => {
       const response = await authAPI.login(credentials);
       console.log('✅ Login response:', response);
       
-      if (response.success) {
+      // FIX: Extract token and user from response.data.data
+      const token = response.data?.token || response.data?.data?.token;
+      const user = response.data?.user || response.data?.data?.user;
+      
+      if (response.success && token && user) {
         // Store token and user data
-        localStorage.setItem('authToken', response.data.token);
-        localStorage.setItem('user', JSON.stringify(response.data.user));
+        localStorage.setItem('authToken', token);
+        localStorage.setItem('user', JSON.stringify(user));
+        
+        console.log('💾 Stored in localStorage:', {
+          token: token.substring(0, 20) + '...',
+          user: user
+        });
         
         dispatch({
           type: AUTH_ACTIONS.LOGIN_SUCCESS,
-          payload: { user: response.data.user },
+          payload: { user },
         });
 
+        console.log('✅ AuthContext: Login successful, dispatching LOGIN_SUCCESS');
         toast.success('Login successful!');
-        console.log('Login successful, user:', response.data.user);
-        return { success: true, user: response.data.user };
+        console.log('Login successful, user:', user);
+        return { success: true, user };
       } else {
+        console.log('❌ AuthContext: Login failed - missing token or user');
+        console.log('Response success:', response.success);
+        console.log('Token exists:', !!token);
+        console.log('User exists:', !!user);
         throw new Error(response.message || 'Login failed');
       }
     } catch (error) {

@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Login Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        .test-section { margin: 20px 0; padding: 20px; border: 1px solid #ccc; }
+        button { padding: 10px 20px; margin: 5px; background: #0071ce; color: white; border: none; cursor: pointer; }
+        button:hover { background: #005a9e; }
+        .result { margin-top: 10px; padding: 10px; background: #f0f0f0; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Customer Login Test</h1>
+    
+    <div class="test-section">
+        <h3>1. Test Backend Login API</h3>
+        <button onclick="testBackendLogin()">Test Backend Login</button>
+        <div id="backend-result" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>2. Test Frontend Login Flow</h3>
+        <button onclick="testFrontendLogin()">Test Frontend Login</button>
+        <div id="frontend-result" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>3. Check Local Storage</h3>
+        <button onclick="checkLocalStorage()">Check Local Storage</button>
+        <div id="storage-result" class="result"></div>
+    </div>
+
+    <script>
+        async function testBackendLogin() {
+            const resultDiv = document.getElementById('backend-result');
+            resultDiv.innerHTML = 'Testing...';
+            
+            try {
+                const response = await fetch('http://localhost:5001/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: 'kartik@gmail.com',
+                        password: '123456',
+                        role: 'customer'
+                    })
+                });
+                
+                const data = await response.json();
+                resultDiv.innerHTML = `<strong>Backend Response:</strong><br><pre>${JSON.stringify(data, null, 2)}</pre>`;
+            } catch (error) {
+                resultDiv.innerHTML = `<strong>Error:</strong> ${error.message}`;
+            }
+        }
+        
+        async function testFrontendLogin() {
+            const resultDiv = document.getElementById('frontend-result');
+            resultDiv.innerHTML = 'Testing...';
+            
+            try {
+                // Simulate the frontend login flow
+                const response = await fetch('http://localhost:5001/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: 'kartik@gmail.com',
+                        password: '123456',
+                        role: 'customer'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Simulate storing in localStorage
+                    localStorage.setItem('authToken', data.data.token);
+                    localStorage.setItem('user', JSON.stringify(data.data.user));
+                    
+                    resultDiv.innerHTML = `
+                        <strong>Frontend Login Success!</strong><br>
+                        Token stored: ${data.data.token ? 'YES' : 'NO'}<br>
+                        User stored: ${data.data.user ? 'YES' : 'NO'}<br>
+                        User role: ${data.data.user.role}<br>
+                        <br>
+                        <strong>Next step:</strong> Navigate to <a href="http://localhost:3000/dashboard/customer" target="_blank">http://localhost:3000/dashboard/customer</a>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `<strong>Login Failed:</strong> ${data.message}`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<strong>Error:</strong> ${error.message}`;
+            }
+        }
+        
+        function checkLocalStorage() {
+            const resultDiv = document.getElementById('storage-result');
+            const token = localStorage.getItem('authToken');
+            const user = localStorage.getItem('user');
+            
+            resultDiv.innerHTML = `
+                <strong>Local Storage Contents:</strong><br>
+                Token: ${token ? 'EXISTS' : 'NOT FOUND'}<br>
+                User: ${user ? 'EXISTS' : 'NOT FOUND'}<br>
+                ${user ? `<br><strong>User Data:</strong><br><pre>${user}</pre>` : ''}
+            `;
+        }
+    </script>
+</body>
+</html> 

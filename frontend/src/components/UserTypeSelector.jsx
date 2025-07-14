@@ -168,10 +168,10 @@ const UserTypeSelector = ({ onSelectUserType }) => {
                 </div>
 
                 {/* Action Button */}
-                {type.id === 'supplier' ? (
+                {(type.id === 'supplier' || type.id === 'customer') ? (
                   <div className="space-y-3">
                     <Link
-                      to="/login/supplier"
+                      to={`/login/${type.id}`}
                       className={`
                         relative overflow-hidden block w-full
                         bg-gradient-to-r ${type.color} text-white rounded-xl
