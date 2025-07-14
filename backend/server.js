@@ -74,20 +74,26 @@ app.use(helmet({
   },
 }));
 
-// CORS configuration
+// Force CORS headers for all requests (BEFORE any other middleware)
+app.use((req, res, next) => {
+  console.log('🌐 CORS Middleware - Origin:', req.headers.origin);
+  res.header('Access-Control-Allow-Origin', 'https://walmart7768.vercel.app');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
+  }
+  
+  next();
+});
+
+// CORS configuration (backup)
 app.use(cors({
-  origin: [
-    'https://walmart7768.vercel.app', // Your actual Vercel domain
-    'https://walmart-digital-revolution.vercel.app',
-    'https://walmart-frontend.vercel.app',
-    'https://walmart.vercel.app',
-    process.env.FRONTEND_URL, // Dynamic frontend URL from environment
-    'http://localhost:3000', 
-    'http://127.0.0.1:3000', 
-    'http://192.168.29.4:3000',
-    'http://localhost:5001',
-    'http://192.168.29.4:5001'
-  ].filter(Boolean), // Remove any undefined values
+  origin: 'https://walmart7768.vercel.app',
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
@@ -97,22 +103,7 @@ app.use(cors({
 console.log('🌐 CORS Configuration:', {
   nodeEnv: process.env.NODE_ENV,
   frontendUrl: process.env.FRONTEND_URL,
-  allowedOrigins: [
-    'https://walmart7768.vercel.app',
-    'https://walmart-digital-revolution.vercel.app',
-    'https://walmart-frontend.vercel.app',
-    'https://walmart.vercel.app',
-    process.env.FRONTEND_URL
-  ].filter(Boolean)
-});
-
-// Force CORS headers for all requests
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', 'https://walmart7768.vercel.app');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-  next();
+  allowedOrigin: 'https://walmart7768.vercel.app'
 });
 
 // Body parsing middleware
