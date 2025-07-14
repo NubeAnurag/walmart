@@ -20,10 +20,12 @@ import {
   CheckCircle,
   AlertCircle,
   X,
-  Mail
+  Mail,
+  MessageCircle
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { customerAPI } from '../services/api';
+import ChatBot from './ChatBot';
 
 const CustomerDashboard = () => {
   const { user, logout } = useAuth();
@@ -53,6 +55,12 @@ const CustomerDashboard = () => {
     phone: user?.phone || ''
   });
   const [storeInventoryCounts, setStoreInventoryCounts] = useState({});
+  const [isChatOpen, setIsChatOpen] = useState(false);
+
+  // Toggle chat
+  const toggleChat = () => {
+    setIsChatOpen(!isChatOpen);
+  };
 
   // Load stores on component mount
   useEffect(() => {
@@ -633,21 +641,21 @@ const CustomerDashboard = () => {
           {stores.map((store) => {
             const inventoryCount = storeInventoryCounts[store._id || store.id] || 0;
             return (
-              <div
+            <div
                 key={store._id || store.id}
-                onClick={() => handleStoreSelect(store)}
+              onClick={() => handleStoreSelect(store)}
                 className={`bg-white rounded-lg shadow-md p-6 cursor-pointer hover:shadow-lg transition-shadow border-2 border-transparent hover:border-blue-500 ${
                   inventoryCount === 0 ? 'opacity-60' : ''
                 }`}
-              >
-                <div className="flex items-center mb-4">
-                  <Store className="h-8 w-8 text-blue-600 mr-3" />
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900">{store.name}</h3>
-                    <p className="text-sm text-gray-600">{store.storeCode}</p>
-                  </div>
+            >
+              <div className="flex items-center mb-4">
+                <Store className="h-8 w-8 text-blue-600 mr-3" />
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">{store.name}</h3>
+                  <p className="text-sm text-gray-600">{store.storeCode}</p>
                 </div>
-                <p className="text-gray-700 mb-2">{store.address}</p>
+              </div>
+              <p className="text-gray-700 mb-2">{store.address}</p>
                 <p className="text-gray-600 mb-3">{store.phone}</p>
                 <div className="flex justify-between items-center">
                   <span className={`text-sm px-3 py-1 rounded-full ${
@@ -657,7 +665,7 @@ const CustomerDashboard = () => {
                   }`}>
                     {inventoryCount > 0 ? `${inventoryCount} products available` : 'No inventory'}
                   </span>
-                </div>
+            </div>
               </div>
             );
           })}
@@ -1033,11 +1041,11 @@ const CustomerDashboard = () => {
               />
             </div>
           </div>
-        </div>
-      )}
-    </div>
-  );
-};
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -1253,6 +1261,24 @@ const CustomerDashboard = () => {
           </div>
         </div>
       )}
+
+      {/* Floating Chat Button */}
+      {!isChatOpen && (
+        <button
+          onClick={toggleChat}
+          className="fixed bottom-4 right-4 bg-blue-500 text-white p-4 rounded-full shadow-lg hover:bg-blue-600 transition-colors z-40"
+          title="Chat with Walmart Assistant"
+        >
+          <MessageCircle size={24} />
+        </button>
+      )}
+
+      {/* ChatBot Component */}
+      <ChatBot 
+        isOpen={isChatOpen} 
+        onToggle={toggleChat} 
+        user={user} 
+      />
     </div>
   );
 };

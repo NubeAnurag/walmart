@@ -26,6 +26,9 @@ const storeRoutes = require('./routes/stores');
 const adminRoutes = require('./routes/admin');
 const managerOrderRoutes = require('./routes/managerOrders');
 const customerRoutes = require('./routes/customer');
+// const aiOptimizationRoutes = require('./routes/aiOptimization');
+const productAnalyticsRoutes = require('./routes/productAnalytics');
+const chatbotRoutes = require('./routes/chatbot');
 
 const app = express();
 const server = http.createServer(app);
@@ -124,6 +127,9 @@ app.use('/api/inventory', inventoryRoutes);
 app.use('/api/sales', salesRoutes);
 app.use('/api/attendance', require('./routes/attendance'));
 app.use('/api/customer', customerRoutes);
+// app.use('/api/ai-optimization', aiOptimizationRoutes);
+app.use('/api/product-analytics', productAnalyticsRoutes);
+app.use('/api/chatbot', chatbotRoutes);
 
 // Temporary test route for inventory debugging
 const { testInventoryDirect, getAllProducts } = require('./controllers/inventoryController');

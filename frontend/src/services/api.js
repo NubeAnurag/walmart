@@ -397,6 +397,101 @@ export const managerAPI = {
   },
 
   // Attendance Management
+
+  // AI Optimization
+  getAIInsights: async (storeId) => {
+    try {
+      console.log('🧠 Fetching AI insights for store:', storeId);
+      const response = await api.get(`/ai-optimization/insights/${storeId}`);
+      console.log('🧠 AI insights response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('❌ Error fetching AI insights:', error);
+      throw error;
+    }
+  },
+
+  runAIAnalysis: async (storeId) => {
+    try {
+      console.log('🧠 Running AI analysis for store:', storeId);
+      const response = await api.post(`/ai-optimization/analyze/${storeId}`);
+      console.log('🧠 AI analysis response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('❌ Error running AI analysis:', error);
+      throw error;
+    }
+  },
+
+  applyAIRecommendation: async (recommendationId, action, quantity) => {
+    try {
+      console.log('🧠 Applying AI recommendation:', recommendationId);
+      const response = await api.post(`/ai-optimization/recommendations/${recommendationId}/apply`, {
+        action,
+        quantity
+      });
+      console.log('🧠 Apply recommendation response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('❌ Error applying AI recommendation:', error);
+      throw error;
+    }
+  },
+
+  getAIModelPerformance: async (storeId) => {
+    try {
+      console.log('🧠 Fetching AI model performance for store:', storeId);
+      const response = await api.get(`/ai-optimization/performance/${storeId}`);
+      console.log('🧠 AI model performance response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('❌ Error fetching AI model performance:', error);
+      throw error;
+    }
+  },
+
+  // Product Analytics
+  getProductPerformance: async (storeId, timeframe = '30') => {
+    try {
+      console.log('📊 Fetching product performance for store:', storeId);
+      const response = await api.get(`/product-analytics/performance/${storeId}`, {
+        params: { timeframe }
+      });
+      console.log('📊 Product performance response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('❌ Error fetching product performance:', error);
+      throw error;
+    }
+  },
+
+  getProfitabilityInsights: async (storeId) => {
+    try {
+      console.log('💰 Fetching profitability insights for store:', storeId);
+      const response = await api.get(`/product-analytics/profitability/${storeId}`);
+      console.log('💰 Profitability insights response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('❌ Error fetching profitability insights:', error);
+      throw error;
+    }
+  },
+
+  applyProductRecommendation: async (productId, action, quantity, reason) => {
+    try {
+      console.log('📊 Applying product recommendation:', productId);
+      const response = await api.post(`/product-analytics/recommendations/${productId}/apply`, {
+        action,
+        quantity,
+        reason
+      });
+      console.log('📊 Apply recommendation response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('❌ Error applying product recommendation:', error);
+      throw error;
+    }
+  },
   getStaffAttendance: async (staffId, year, month) => {
     try {
       console.log('📅 Fetching staff attendance:', { staffId, year, month });
@@ -745,6 +840,100 @@ export const salesAPI = {
       throw error;
     }
   },
+};
+
+// Chatbot API
+export const chatbotAPI = {
+  // Send message to chatbot
+  sendMessage: async (message, sessionId) => {
+    try {
+      console.log('🤖 Sending message to chatbot:', { message, sessionId });
+      const response = await api.post('/chatbot/message', { message, sessionId });
+      console.log('📥 Chatbot response received:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('❌ Chatbot sendMessage error:', error);
+      throw error;
+    }
+  },
+  
+  // Get chat history for a session
+  getChatHistory: async (sessionId, limit = 50) => {
+    try {
+      console.log('📜 Getting chat history for session:', sessionId);
+      const response = await api.get(`/chatbot/history/${sessionId}?limit=${limit}`);
+      console.log('📥 Chat history received:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('❌ Chatbot getChatHistory error:', error);
+      throw error;
+    }
+  },
+  
+  // Get all chat sessions
+  getChatSessions: async (limit = 10) => {
+    try {
+      console.log('📋 Getting chat sessions');
+      const response = await api.get(`/chatbot/sessions?limit=${limit}`);
+      console.log('📥 Chat sessions received:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('❌ Chatbot getChatSessions error:', error);
+      throw error;
+    }
+  },
+  
+  // Create new chat session
+  createSession: async () => {
+    try {
+      console.log('🆕 Creating new chat session');
+      const response = await api.post('/chatbot/session');
+      console.log('📥 New session created:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('❌ Chatbot createSession error:', error);
+      throw error;
+    }
+  },
+  
+  // Rate a bot message
+  rateMessage: async (messageId, rating, helpful) => {
+    try {
+      console.log('⭐ Rating message:', { messageId, rating, helpful });
+      const response = await api.post(`/chatbot/rate/${messageId}`, { rating, helpful });
+      console.log('📥 Rating response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('❌ Chatbot rateMessage error:', error);
+      throw error;
+    }
+  },
+  
+  // Get product recommendations
+  getProductRecommendations: async (preferences = {}) => {
+    try {
+      console.log('🛍️ Getting product recommendations:', preferences);
+      const response = await api.post('/chatbot/recommendations', { preferences });
+      console.log('📥 Product recommendations received:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('❌ Chatbot getProductRecommendations error:', error);
+      throw error;
+    }
+  },
+  
+  // Get chat analytics
+  getChatAnalytics: async (days = 30) => {
+    try {
+      console.log('📊 Getting chat analytics for', days, 'days');
+      const response = await api.get(`/chatbot/analytics?days=${days}`);
+      console.log('📥 Chat analytics received:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('❌ Chatbot getChatAnalytics error:', error);
+      throw error;
+    }
+  }
 };
 
 export const handleAPIError = (error) => {

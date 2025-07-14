@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import ProductAnalyticsDashboard from './ProductAnalyticsDashboard';
 import { 
   BarChart3, 
   Users, 
@@ -394,7 +395,8 @@ const ManagerDashboard = () => {
     { id: 'supplier-performance', label: 'Supplier Performance', icon: Award },
     { id: 'alerts', label: 'Alerts', icon: Bell },
     { id: 'inventory', label: 'Inventory', icon: Warehouse },
-    { id: 'ai-optimization', label: 'AI Optimization', icon: Brain }
+    { id: 'ai-optimization', label: 'AI Optimization', icon: Brain },
+    { id: 'product-analytics', label: 'Product Analytics', icon: BarChart3 }
   ];
 
   if (loading) {
@@ -536,6 +538,7 @@ const ManagerDashboard = () => {
         {activeTab === 'reports' && <ReportsTab reports={reports} setReports={setReports} />}
         {activeTab === 'analytics' && <AnalyticsTab data={dashboardData} />}
         {activeTab === 'ai-optimization' && <AIOptimizationTab />}
+        {activeTab === 'product-analytics' && <ProductAnalyticsDashboard />}
       </div>
     </div>
   );
@@ -2280,6 +2283,7 @@ const AlertsTab = ({ alerts }) => {
 
 // AI Optimization Tab Component
 const AIOptimizationTab = () => {
+  const { user } = useAuth();
   const [optimizationData, setOptimizationData] = useState({
     recommendations: [
       {
@@ -2386,6 +2390,91 @@ const AIOptimizationTab = () => {
     }
   };
 
+  const [loading, setLoading] = useState(false);
+  const [analysisRunning, setAnalysisRunning] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(null);
+
+  // Fetch AI insights on component mount
+  useEffect(() => {
+    if (user?.storeId?._id) {
+      fetchAIInsights();
+    }
+  }, [user?.storeId?._id]);
+
+  // Auto-refresh every 5 minutes
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (user?.storeId?._id) {
+        fetchAIInsights();
+      }
+    }, 5 * 60 * 1000); // 5 minutes
+
+    return () => clearInterval(interval);
+  }, [user?.storeId?._id]);
+
+  const fetchAIInsights = async () => {
+    try {
+      setLoading(true);
+      console.log('🧠 Fetching AI insights for store:', user.storeId._id);
+      
+      const response = await managerAPI.getAIInsights(user.storeId._id);
+      
+      if (response.success) {
+        setOptimizationData({
+          insights: response.data.insights,
+          recommendations: response.data.recommendations,
+          predictions: response.data.predictions
+        });
+        setLastUpdated(response.data.lastUpdated);
+        console.log('✅ AI insights updated successfully');
+      }
+    } catch (error) {
+      console.error('❌ Error fetching AI insights:', error);
+      // Keep existing data if fetch fails
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const runAIAnalysis = async () => {
+    try {
+      setAnalysisRunning(true);
+      console.log('🧠 Running AI analysis for store:', user.storeId._id);
+      
+      const response = await managerAPI.runAIAnalysis(user.storeId._id);
+      
+      if (response.success) {
+        setOptimizationData({
+          insights: response.data.insights,
+          recommendations: response.data.recommendations,
+          predictions: response.data.predictions
+        });
+        setLastUpdated(response.data.analysisCompletedAt);
+        console.log('✅ AI analysis completed successfully');
+      }
+    } catch (error) {
+      console.error('❌ Error running AI analysis:', error);
+    } finally {
+      setAnalysisRunning(false);
+    }
+  };
+
+  const applyRecommendation = async (recommendationId, action, quantity) => {
+    try {
+      console.log('🧠 Applying recommendation:', recommendationId);
+      
+      const response = await managerAPI.applyAIRecommendation(recommendationId, action, quantity);
+      
+      if (response.success) {
+        console.log('✅ Recommendation applied successfully');
+        // Refresh insights after applying recommendation
+        await fetchAIInsights();
+      }
+    } catch (error) {
+      console.error('❌ Error applying recommendation:', error);
+    }
+  };
+
   const getTrendIcon = (trend) => {
     return trend === 'up' ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />;
   };
@@ -2397,33 +2486,117 @@ const AIOptimizationTab = () => {
         <div>
           <h2 className="text-2xl font-bold text-gray-900">AI Inventory Optimization</h2>
           <p className="text-gray-600">Leverage artificial intelligence to optimize your inventory management</p>
+          {lastUpdated && (
+            <p className="text-sm text-gray-500 mt-1">
+              Last updated: {new Date(lastUpdated).toLocaleString()}
+            </p>
+          )}
         </div>
-        <button className="btn btn-primary">
-          <Zap className="w-4 h-4 mr-2" />
-          Run AI Analysis
-        </button>
+        <div className="flex items-center space-x-3">
+          {loading && (
+            <div className="flex items-center text-blue-600">
+              <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+              <span className="text-sm">Updating...</span>
+            </div>
+          )}
+          <button 
+            onClick={runAIAnalysis}
+            disabled={analysisRunning}
+            className={`btn btn-primary ${analysisRunning ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
+            {analysisRunning ? (
+              <>
+                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                Analyzing...
+              </>
+            ) : (
+              <>
+                <Zap className="w-4 h-4 mr-2" />
+                Run AI Analysis
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* AI Insights Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {optimizationData.insights.map((insight, index) => (
-          <div key={index} className="bg-white p-6 rounded-lg shadow">
-            <div className="flex items-center justify-between mb-4">
-              <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-blue-600 rounded-lg flex items-center justify-center">
-                <Brain className="w-5 h-5 text-white" />
+        {optimizationData.insights ? (
+          <>
+            <div className="bg-white p-6 rounded-lg shadow">
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-blue-600 rounded-lg flex items-center justify-center">
+                  <TrendingUp className="w-5 h-5 text-white" />
+                </div>
+                <div className="flex items-center space-x-1 px-2 py-1 rounded-full text-sm font-medium text-green-600 bg-green-50">
+                  <ArrowUpRight className="w-4 h-4" />
+                  <span>+0.8</span>
+                </div>
               </div>
-              <div className={`flex items-center space-x-1 px-2 py-1 rounded-full text-sm font-medium ${
-                insight.trend === 'up' ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50'
-              }`}>
-                {getTrendIcon(insight.trend)}
-                <span>{insight.change}</span>
-              </div>
+              <h3 className="text-sm font-medium text-gray-600 mb-1">Stock Turnover Rate</h3>
+              <p className="text-2xl font-bold text-gray-900 mb-1">{optimizationData.insights.stockTurnoverRate}</p>
+              <p className="text-xs text-gray-500">Higher is better</p>
             </div>
-            <h3 className="text-sm font-medium text-gray-600 mb-1">{insight.metric}</h3>
-            <p className="text-2xl font-bold text-gray-900 mb-1">{insight.value}</p>
-            <p className="text-xs text-gray-500">{insight.description}</p>
-          </div>
-        ))}
+
+            <div className="bg-white p-6 rounded-lg shadow">
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-10 h-10 bg-gradient-to-r from-red-500 to-orange-600 rounded-lg flex items-center justify-center">
+                  <DollarSign className="w-5 h-5 text-white" />
+                </div>
+                <div className="flex items-center space-x-1 px-2 py-1 rounded-full text-sm font-medium text-red-600 bg-red-50">
+                  <ArrowDownRight className="w-4 h-4" />
+                  <span>-$2,100</span>
+                </div>
+              </div>
+              <h3 className="text-sm font-medium text-gray-600 mb-1">Carrying Cost</h3>
+              <p className="text-2xl font-bold text-gray-900 mb-1">{optimizationData.insights.carryingCost}</p>
+              <p className="text-xs text-gray-500">Lower is better</p>
+            </div>
+
+            <div className="bg-white p-6 rounded-lg shadow">
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-10 h-10 bg-gradient-to-r from-green-500 to-emerald-600 rounded-lg flex items-center justify-center">
+                  <CheckCircle className="w-5 h-5 text-white" />
+                </div>
+                <div className="flex items-center space-x-1 px-2 py-1 rounded-full text-sm font-medium text-green-600 bg-green-50">
+                  <ArrowDownRight className="w-4 h-4" />
+                  <span>-0.8%</span>
+                </div>
+              </div>
+              <h3 className="text-sm font-medium text-gray-600 mb-1">Stockout Rate</h3>
+              <p className="text-2xl font-bold text-gray-900 mb-1">{optimizationData.insights.stockoutRate}</p>
+              <p className="text-xs text-gray-500">Lower is better</p>
+            </div>
+
+            <div className="bg-white p-6 rounded-lg shadow">
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
+                  <Target className="w-5 h-5 text-white" />
+                </div>
+                <div className="flex items-center space-x-1 px-2 py-1 rounded-full text-sm font-medium text-green-600 bg-green-50">
+                  <ArrowUpRight className="w-4 h-4" />
+                  <span>+3.1%</span>
+                </div>
+              </div>
+              <h3 className="text-sm font-medium text-gray-600 mb-1">Forecast Accuracy</h3>
+              <p className="text-2xl font-bold text-gray-900 mb-1">{optimizationData.insights.forecastAccuracy}</p>
+              <p className="text-xs text-gray-500">Higher is better</p>
+            </div>
+          </>
+        ) : (
+          // Loading state
+          Array.from({ length: 4 }).map((_, index) => (
+            <div key={index} className="bg-white p-6 rounded-lg shadow animate-pulse">
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-10 h-10 bg-gray-200 rounded-lg"></div>
+                <div className="w-16 h-6 bg-gray-200 rounded-full"></div>
+              </div>
+              <div className="h-4 bg-gray-200 rounded mb-2"></div>
+              <div className="h-8 bg-gray-200 rounded mb-2"></div>
+              <div className="h-3 bg-gray-200 rounded"></div>
+            </div>
+          ))
+        )}
       </div>
 
       {/* AI Recommendations */}
@@ -2434,7 +2607,7 @@ const AIOptimizationTab = () => {
         </div>
         <div className="p-6">
           <div className="space-y-4">
-            {optimizationData.recommendations.map((recommendation) => (
+            {optimizationData.recommendations?.map((recommendation) => (
               <div key={recommendation.id} className="border border-gray-200 rounded-lg p-4">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
@@ -2457,15 +2630,38 @@ const AIOptimizationTab = () => {
                         <Clock className="w-4 h-4 text-gray-400" />
                         <span className="text-gray-500">{recommendation.timeframe}</span>
                       </div>
+                      {recommendation.recommendedQuantity && (
+                        <div className="flex items-center space-x-1">
+                          <Package className="w-4 h-4 text-blue-600" />
+                          <span className="text-blue-600 font-medium">Qty: {recommendation.recommendedQuantity}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="flex space-x-2">
-                    <button className="btn btn-sm btn-primary">Apply</button>
-                    <button className="btn btn-sm btn-secondary">Dismiss</button>
+                    <button 
+                      onClick={() => applyRecommendation(recommendation.id, 'apply', recommendation.recommendedQuantity)}
+                      className="btn btn-sm btn-primary"
+                    >
+                      Apply
+                    </button>
+                    <button 
+                      onClick={() => applyRecommendation(recommendation.id, 'dismiss')}
+                      className="btn btn-sm btn-secondary"
+                    >
+                      Dismiss
+                    </button>
                   </div>
                 </div>
               </div>
             ))}
+            {(!optimizationData.recommendations || optimizationData.recommendations.length === 0) && (
+              <div className="text-center py-8 text-gray-500">
+                <Brain className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                <p>No AI recommendations available</p>
+                <p className="text-sm">Run AI analysis to generate recommendations</p>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -2490,7 +2686,7 @@ const AIOptimizationTab = () => {
                 </tr>
               </thead>
               <tbody>
-                {optimizationData.predictions.map((prediction, index) => (
+                {optimizationData.predictions?.map((prediction, index) => (
                   <tr key={index} className="border-b border-gray-100">
                     <td className="py-4 px-4">
                       <div className="font-medium text-gray-900">{prediction.product}</div>
@@ -2522,10 +2718,24 @@ const AIOptimizationTab = () => {
                       </div>
                     </td>
                     <td className="py-4 px-4 text-center">
-                      <button className="btn btn-sm btn-primary">Order</button>
+                      <button 
+                        onClick={() => applyRecommendation(prediction.productId, 'order', prediction.recommendedStock - prediction.currentStock)}
+                        className="btn btn-sm btn-primary"
+                      >
+                        Order
+                      </button>
                     </td>
                   </tr>
                 ))}
+                {(!optimizationData.predictions || optimizationData.predictions.length === 0) && (
+                  <tr>
+                    <td colSpan="6" className="py-8 text-center text-gray-500">
+                      <Brain className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                      <p>No demand predictions available</p>
+                      <p className="text-sm">Run AI analysis to generate predictions</p>
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
