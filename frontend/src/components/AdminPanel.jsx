@@ -4,10 +4,6 @@ import {
   UserPlus, 
   Building2, 
   BarChart3, 
-  Search, 
-  Filter, 
-  Eye, 
-  Edit, 
   Trash2, 
   RefreshCw,
   Key,
@@ -48,7 +44,7 @@ const AdminPanel = () => {
   const [generatedPassword, setGeneratedPassword] = useState('');
 
   // Filters
-  const [filters, setFilters] = useState({
+  const [filters] = useState({
     search: '',
     role: '',
     storeId: ''
@@ -63,7 +59,7 @@ const AdminPanel = () => {
     } else if (activeTab === 'by-store') {
       loadEmployeesByStore();
     }
-  }, [activeTab]);
+  }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadDashboardStats = async () => {
     try {

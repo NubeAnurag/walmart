@@ -20,7 +20,7 @@ const AttendanceCalendar = ({ staffId, onClose }) => {
 
   useEffect(() => {
     fetchAttendanceData();
-  }, [staffId, currentMonth, currentYear]);
+  }, [staffId, currentMonth, currentYear]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchAttendanceData = async () => {
     try {
@@ -154,7 +154,7 @@ const AttendanceCalendar = ({ staffId, onClose }) => {
     }
     
     const firstDay = new Date(currentYear, currentMonth - 1, 1).getDay();
-    const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
+    // const daysInMonth = new Date(currentYear, currentMonth, 0).getDate(); // Unused variable
     
     // Create calendar grid
     const calendarDays = [];

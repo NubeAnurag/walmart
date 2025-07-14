@@ -6,7 +6,6 @@ import {
   ThumbsUp, 
   ThumbsDown, 
   Star, 
-  ShoppingCart, 
   Package,
   Minimize2,
   Maximize2,
@@ -15,7 +14,6 @@ import {
   User,
   Bot,
   Clock,
-  CheckCircle,
   AlertCircle
 } from 'lucide-react';
 import { chatbotAPI } from '../services/api';
@@ -50,7 +48,7 @@ const ChatBot = ({ isOpen, onToggle, user }) => {
     if (isOpen && !currentSessionId) {
       initializeChat();
     }
-  }, [isOpen]);
+  }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Initialize chat session
   const initializeChat = async () => {
@@ -169,16 +167,16 @@ const ChatBot = ({ isOpen, onToggle, user }) => {
   };
 
   // Load chat sessions
-  const loadSessions = async () => {
-    try {
-      const response = await chatbotAPI.getChatSessions();
-      if (response.success) {
-        setSessions(response.data.sessions);
-      }
-    } catch (error) {
-      console.error('Failed to load sessions:', error);
-    }
-  };
+  // const loadSessions = async () => {
+  //   try {
+  //     const response = await chatbotAPI.getChatSessions();
+  //     if (response.success) {
+  //         setSessions(response.data.sessions);
+  //     }
+  //   } catch (error) {
+  //     console.error('Failed to load sessions:', error);
+  //   }
+  // };
 
   // Load session history
   const loadSessionHistory = async (sessionId) => {
