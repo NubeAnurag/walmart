@@ -1,7 +1,7 @@
 {
   "name": "walmart-api",
   "version": "1.0.0",
-  "description": "Walmart Digital Revolution API for Vercel",
+  "description": "Walmart Digital Revolution API for Vercel - Updated",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
