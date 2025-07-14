@@ -2,17 +2,13 @@ import axios from 'axios';
 
 // Create axios instance with default config
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'https://walmart-pdji.onrender.com/api', // <-- Updated for production
+  baseURL: process.env.REACT_APP_API_URL || 'https://walmart-pdji.onrender.com/api',
   timeout: 10000,
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
 });
-
-// Log the API base URL for debugging
-console.log('🔗 API Base URL configured as:', api.defaults.baseURL);
-console.log('🔗 Environment API URL:', process.env.REACT_APP_API_URL);
 
 // Request interceptor to add auth token
 api.interceptors.request.use(
@@ -719,7 +715,7 @@ export const adminAPI = {
 // General API functions
 export const generalAPI = {
   healthCheck: async () => {
-    const response = await axios.get('https://walmart-pdji.onrender.com/health'); // Updated for production
+    const response = await axios.get('http://localhost:5001/health');
     return response.data;
   },
 

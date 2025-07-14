@@ -52,7 +52,7 @@ const GoogleSignIn = ({ onSuccess, onError, className = '', text = 'Sign in with
         onError(error.message);
       }
     }
-  }, [navigate, onSuccess, onError, checkAuthStatus]);
+  }, [navigate, onSuccess, onError, checkAuthStatus, selectedRole]);
 
   useEffect(() => {
     // Initialize Google Sign-In when component mounts
