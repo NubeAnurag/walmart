@@ -8,6 +8,16 @@ const session = require('express-session');
 // const passport = require('./config/passport');
 require('dotenv').config();
 
+// Validate required environment variables
+const requiredEnvVars = ['MONGODB_URI', 'JWT_SECRET'];
+const missingEnvVars = requiredEnvVars.filter(envVar => !process.env[envVar]);
+
+if (missingEnvVars.length > 0) {
+  console.error('❌ Missing required environment variables:', missingEnvVars);
+  console.error('💡 Please set these environment variables in your deployment platform');
+  process.exit(1);
+}
+
 // Import database connection
 const connectDB = require('./config/database');
 const { initializeSocket } = require('./config/socket');
@@ -119,7 +129,17 @@ app.get('/health', (req, res) => {
     message: 'Walmart Digital Revolution API is running',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development',
-    database: 'MongoDB'
+    database: 'MongoDB',
+    port: PORT
+  });
+});
+
+// Simple ping endpoint for basic connectivity test
+app.get('/ping', (req, res) => {
+  res.json({
+    success: true,
+    message: 'pong',
+    timestamp: new Date().toISOString()
   });
 });
 
@@ -302,14 +322,19 @@ process.on('SIGINT', async () => {
   process.exit(0);
 });
 
-// Start server
-server.listen(PORT, '0.0.0.0', () => {
+// Start server with error handling
+server.listen(PORT, () => {
   console.log(`🚀 Walmart Digital Revolution API running on port ${PORT}`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
-  console.log(`🌐 Network access: http://192.168.29.4:${PORT}/health`);
   console.log(`🍃 Database: MongoDB`);
   console.log(`⚡ Socket.io: Real-time features enabled`);
+}).on('error', (error) => {
+  console.error('❌ Server failed to start:', error.message);
+  if (error.code === 'EADDRINUSE') {
+    console.log('💡 Port is already in use. Try a different port.');
+  }
+  process.exit(1);
 });
 
 module.exports = { app, server, io };
