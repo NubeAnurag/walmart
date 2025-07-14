@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Create axios instance with default config
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5001/api',
+  baseURL: process.env.REACT_APP_API_URL || 'https://walmart-pdji.onrender.com/api', // <-- Updated for production
   timeout: 10000,
   withCredentials: true,
   headers: {
@@ -715,7 +715,7 @@ export const adminAPI = {
 // General API functions
 export const generalAPI = {
   healthCheck: async () => {
-    const response = await axios.get('http://localhost:5001/health');
+    const response = await axios.get('https://walmart-pdji.onrender.com/health'); // Updated for production
     return response.data;
   },
 
