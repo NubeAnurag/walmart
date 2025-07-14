@@ -137,7 +137,7 @@ const RegisterModal = ({ isOpen, onClose, selectedRole, onSwitchToLogin }) => {
     
     console.log('🚀 Registration form submitted');
     console.log('📝 Form data:', formData);
-    console.log('📡 API Base URL:', process.env.REACT_APP_API_URL || 'http://localhost:5001/api');
+    console.log('📡 API Base URL:', process.env.REACT_APP_API_URL || 'https://walmart-pdji.onrender.com/api');
     
     if (!validateForm()) {
       console.log('❌ Form validation failed');
