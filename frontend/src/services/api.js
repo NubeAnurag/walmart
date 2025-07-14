@@ -10,6 +10,10 @@ const api = axios.create({
   },
 });
 
+// Log the API base URL for debugging
+console.log('🔗 API Base URL configured as:', api.defaults.baseURL);
+console.log('🔗 Environment API URL:', process.env.REACT_APP_API_URL);
+
 // Request interceptor to add auth token
 api.interceptors.request.use(
   (config) => {
