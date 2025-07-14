@@ -248,10 +248,10 @@ const HomePage = () => {
               <ul className="space-y-3">
                 {['For Customers', 'For Managers', 'For Staff', 'For Suppliers', 'Enterprise', 'API Access'].map((link, index) => (
                   <li key={index}>
-                    <a href="#" className="text-gray-300 hover:text-walmart-yellow transition-colors duration-300 flex items-center group">
+                    <button className="text-gray-300 hover:text-walmart-yellow transition-colors duration-300 flex items-center group">
                       <span className="w-1 h-1 bg-walmart-yellow rounded-full mr-3 opacity-0 group-hover:opacity-100 transition-opacity"></span>
                       {link}
-                    </a>
+                    </button>
                   </li>
                 ))}
               </ul>
@@ -263,10 +263,10 @@ const HomePage = () => {
               <ul className="space-y-3">
                 {['Documentation', 'Help Center', 'Community', 'Blog', 'Case Studies', 'Webinars'].map((link, index) => (
                   <li key={index}>
-                    <a href="#" className="text-gray-300 hover:text-walmart-yellow transition-colors duration-300 flex items-center group">
+                    <button className="text-gray-300 hover:text-walmart-yellow transition-colors duration-300 flex items-center group">
                       <span className="w-1 h-1 bg-walmart-yellow rounded-full mr-3 opacity-0 group-hover:opacity-100 transition-opacity"></span>
                       {link}
-                    </a>
+                    </button>
                   </li>
                 ))}
               </ul>
@@ -285,14 +285,13 @@ const HomePage = () => {
                     { icon: <Instagram className="w-5 h-5" />, name: 'Instagram' },
                     { icon: <Linkedin className="w-5 h-5" />, name: 'LinkedIn' }
                   ].map((social, index) => (
-                    <a 
+                    <button 
                       key={index}
-                      href="#" 
                       className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center text-gray-300 hover:bg-walmart-blue hover:text-white transition-all duration-300 transform hover:scale-110"
                       title={social.name}
                     >
                       {social.icon}
-                    </a>
+                    </button>
                   ))}
                 </div>
               </div>
@@ -321,9 +320,9 @@ const HomePage = () => {
             </p>
             <div className="flex flex-wrap gap-6 text-sm">
               {['Privacy Policy', 'Terms of Service', 'Cookie Policy', 'Accessibility'].map((link, index) => (
-                <a key={index} href="#" className="text-gray-400 hover:text-walmart-yellow transition-colors duration-300">
+                <button key={index} className="text-gray-400 hover:text-walmart-yellow transition-colors duration-300">
                   {link}
-                </a>
+                </button>
               ))}
             </div>
           </div>

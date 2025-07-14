@@ -3,7 +3,6 @@ import {
   Store, 
   ShoppingCart, 
   Search, 
-  Filter, 
   Grid, 
   List, 
   Plus, 
@@ -14,11 +13,8 @@ import {
   LogOut,
   Package,
   Phone,
-  Star,
   ShoppingBag,
-  CreditCard,
   CheckCircle,
-  AlertCircle,
   X,
   Mail,
   MessageCircle
@@ -65,21 +61,21 @@ const CustomerDashboard = () => {
   // Load stores on component mount
   useEffect(() => {
     loadStores();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load products when store is selected
   useEffect(() => {
     if (selectedStore && currentView === 'products') {
       loadProducts();
     }
-  }, [selectedStore, currentView, searchTerm, selectedCategory, sortBy, currentPage]);
+  }, [selectedStore, currentView, searchTerm, selectedCategory, sortBy, currentPage]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load orders when orders view or dashboard is selected
   useEffect(() => {
     if (currentView === 'orders' || currentView === 'dashboard') {
       loadOrders();
     }
-  }, [currentView]);
+  }, [currentView]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load stores
   const loadStores = async () => {
