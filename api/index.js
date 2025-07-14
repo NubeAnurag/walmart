@@ -7,25 +7,27 @@ const session = require('express-session');
 require('dotenv').config();
 
 // Import database connection
-const connectDB = require('../backend/config/database');
+const connectDB = require('./config/database');
+
+// Note: Socket.io is removed for Vercel serverless compatibility
 
 // Import routes
-const authRoutes = require('../backend/routes/auth');
-const staffRoutes = require('../backend/routes/staff');
-const analyticsRoutes = require('../backend/routes/analytics');
-const supplierRoutes = require('../backend/routes/suppliers');
-const supplierDashboardRoutes = require('../backend/routes/supplier');
-const inventoryRoutes = require('../backend/routes/inventory');
-const salesRoutes = require('../backend/routes/sales');
-const reportsRoutes = require('../backend/routes/reports');
-const customerInsightsRoutes = require('../backend/routes/customerInsights');
-const storeRoutes = require('../backend/routes/stores');
-const adminRoutes = require('../backend/routes/admin');
-const managerOrderRoutes = require('../backend/routes/managerOrders');
-const customerRoutes = require('../backend/routes/customer');
-const aiOptimizationRoutes = require('../backend/routes/aiOptimization');
-const productAnalyticsRoutes = require('../backend/routes/productAnalytics');
-const chatbotRoutes = require('../backend/routes/chatbot');
+const authRoutes = require('./routes/auth');
+const staffRoutes = require('./routes/staff');
+const analyticsRoutes = require('./routes/analytics');
+const supplierRoutes = require('./routes/suppliers');
+const supplierDashboardRoutes = require('./routes/supplier');
+const inventoryRoutes = require('./routes/inventory');
+const salesRoutes = require('./routes/sales');
+const reportsRoutes = require('./routes/reports');
+const customerInsightsRoutes = require('./routes/customerInsights');
+const storeRoutes = require('./routes/stores');
+const adminRoutes = require('./routes/admin');
+const managerOrderRoutes = require('./routes/managerOrders');
+const customerRoutes = require('./routes/customer');
+const aiOptimizationRoutes = require('./routes/aiOptimization');
+const productAnalyticsRoutes = require('./routes/productAnalytics');
+const chatbotRoutes = require('./routes/chatbot');
 
 const app = express();
 
@@ -111,7 +113,7 @@ app.use('/suppliers', supplierRoutes);
 app.use('/supplier', supplierDashboardRoutes);
 app.use('/inventory', inventoryRoutes);
 app.use('/sales', salesRoutes);
-app.use('/attendance', require('../backend/routes/attendance'));
+app.use('/attendance', require('./routes/attendance'));
 app.use('/customer', customerRoutes);
 app.use('/ai-optimization', aiOptimizationRoutes);
 app.use('/product-analytics', productAnalyticsRoutes);
