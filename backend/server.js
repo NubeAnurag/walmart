@@ -67,7 +67,12 @@ app.use(helmet({
 // CORS configuration
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
-    ? ['https://your-production-domain.com'] 
+    ? [
+        'https://walmart-digital-revolution.vercel.app',
+        'https://walmart-frontend.vercel.app',
+        'https://walmart.vercel.app',
+        'https://your-vercel-domain.vercel.app' // Replace with your actual Vercel domain
+      ] 
     : [
         'http://localhost:3000', 
         'http://127.0.0.1:3000', 
