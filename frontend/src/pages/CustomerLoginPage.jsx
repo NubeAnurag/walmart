@@ -90,8 +90,12 @@ const CustomerLoginPage = () => {
         {/* Header */}
         <div className="text-center">
           <div className="flex items-center justify-center mb-6">
-            <div className="w-12 h-12 bg-walmart-blue rounded-full flex items-center justify-center mr-3">
-              <ShoppingCart className="w-6 h-6 text-white" />
+            <div className="w-16 h-12 bg-white rounded-lg flex items-center justify-center mr-3 shadow-md">
+              <img 
+                src="/walmart-logo.png" 
+                alt="Walmart Digital Revolution" 
+                className="w-full h-full object-contain"
+              />
             </div>
             <h1 className="text-3xl font-bold gradient-text">
               Walmart Digital

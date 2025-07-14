@@ -258,7 +258,31 @@ const ManagerDashboard = () => {
       }
       
       // Set state with the data
-      setDashboardData(analyticsRes);
+      // Map backend overview to kpis for OverviewTab
+      const overview = analyticsRes?.data?.overview || {};
+      
+      console.log('🔍 Frontend - Analytics Response:', analyticsRes);
+      console.log('🔍 Frontend - Overview Data:', overview);
+      console.log('🔍 Frontend - Sales Data:', overview.sales);
+      console.log('🔍 Frontend - Staff Data:', overview.staff);
+      console.log('🔍 Frontend - Inventory Data:', overview.inventory);
+      
+      const kpis = {
+        totalSales: overview.sales?.totalRevenue || 0,
+        salesGrowth: overview.sales?.revenueGrowth || 0,
+        totalOrders: overview.sales?.totalSales || 0,
+        orderGrowth: 0, // Not available, set to 0 or calculate if you have previous period data
+        activeStaff: overview.staff?.totalStaff || 0,
+        staffAttendance: overview.staff?.avgAttendanceRate || 0,
+        lowStockCount: overview.inventory?.lowStockItems || 0,
+      };
+      
+      console.log('🔍 Frontend - Final KPIs:', kpis);
+      setDashboardData({
+        kpis,
+        alerts: [], // You can map alerts if you have them
+        recentActivities: [], // Map recent activities if needed
+      });
       setStaff(staffData);
       setSuppliers(suppliersData);
       setInventory(inventoryRes);

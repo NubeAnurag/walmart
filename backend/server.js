@@ -71,7 +71,8 @@ app.use(cors({
         'https://walmart-digital-revolution.vercel.app',
         'https://walmart-frontend.vercel.app',
         'https://walmart.vercel.app',
-        'https://your-vercel-domain.vercel.app' // Replace with your actual Vercel domain
+        'https://your-vercel-domain.vercel.app', // <-- Replace this with your actual Vercel frontend domain after deployment
+        process.env.FRONTEND_URL // <-- Add this line to allow dynamic frontend URL via env variable
       ] 
     : [
         'http://localhost:3000', 

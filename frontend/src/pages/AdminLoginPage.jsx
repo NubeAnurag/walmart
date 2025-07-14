@@ -90,8 +90,12 @@ const AdminLoginPage = () => {
         <div className="bg-white rounded-2xl shadow-xl p-8">
           {/* Header */}
           <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
-              <Shield className="w-8 h-8 text-white" />
+            <div className="w-20 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-md">
+              <img 
+                src="/walmart-logo.png" 
+                alt="Walmart Digital Revolution" 
+                className="w-full h-full object-contain"
+              />
             </div>
             <h1 className="text-3xl font-bold text-gray-800 mb-2">Admin Login</h1>
             <p className="text-gray-600">Access the employee management system</p>

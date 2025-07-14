@@ -14,24 +14,127 @@ const getDashboardOverview = async (req, res) => {
     const storeId = req.user.storeId;
     const { period = '30' } = req.query; // days
     
+    console.log('📊 Analytics Dashboard - User:', req.user.role, 'Store:', storeId);
+    console.log('📊 Period:', period, 'days');
+    
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - parseInt(period));
     const endDate = new Date();
+    
+    console.log('📊 Date range:', startDate.toISOString(), 'to', endDate.toISOString());
 
-    // Get sales analytics
-    const salesData = await Sale.getSalesAnalytics(storeId, startDate, endDate);
-    const salesAnalytics = salesData[0] || {
-      totalSales: 0,
-      totalRevenue: 0,
-      totalProfit: 0,
-      totalItemsSold: 0,
-      avgTransactionValue: 0,
-      avgItemsPerTransaction: 0
-    };
+    // Get sales analytics - for managers, use manager orders instead of sales
+    let salesAnalytics;
+    
+    if (req.user.role === 'manager') {
+      // For managers, use manager orders data
+      const managerId = req.user._id;
+      
+      console.log('📊 Manager Analytics - Manager ID:', managerId);
+      
+      // First, let's check all orders for this manager to understand the data
+      const allManagerOrders = await ManagerOrder.find({
+        managerId: new mongoose.Types.ObjectId(managerId),
+        storeId: new mongoose.Types.ObjectId(storeId)
+      }).select('orderNumber orderDate status totalAmount items');
+      
+      console.log('📊 All Manager Orders:', allManagerOrders.map(order => ({
+        orderNumber: order.orderNumber,
+        orderDate: order.orderDate,
+        status: order.status,
+        totalAmount: order.totalAmount,
+        itemCount: order.items.length
+      })));
+      
+      // Try without date filter first to see all orders
+      const managerOrdersData = await ManagerOrder.aggregate([
+        {
+          $match: {
+            managerId: new mongoose.Types.ObjectId(managerId),
+            storeId: new mongoose.Types.ObjectId(storeId),
+            status: { $in: ['pending', 'approved', 'delivered'] } // Include pending orders too
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            totalSales: { $sum: 1 },
+            totalRevenue: { $sum: '$totalAmount' },
+            totalItemsSold: { $sum: { $sum: '$items.quantity' } }
+          }
+        }
+      ]);
 
-    // Get inventory summary
+      console.log('📊 Manager Orders Data:', managerOrdersData);
+
+      salesAnalytics = managerOrdersData[0] || {
+        totalSales: 0,
+        totalRevenue: 0,
+        totalItemsSold: 0
+      };
+      
+      console.log('📊 Final Sales Analytics:', salesAnalytics);
+      
+      // Calculate additional metrics
+      salesAnalytics.avgTransactionValue = salesAnalytics.totalSales > 0 
+        ? salesAnalytics.totalRevenue / salesAnalytics.totalSales 
+        : 0;
+      salesAnalytics.avgItemsPerTransaction = salesAnalytics.totalSales > 0 
+        ? salesAnalytics.totalItemsSold / salesAnalytics.totalSales 
+        : 0;
+      salesAnalytics.totalProfit = 0; // Not calculated for manager orders
+    } else {
+      // For other roles, use regular sales data
+      const salesData = await Sale.getSalesAnalytics(storeId, startDate, endDate);
+      salesAnalytics = salesData[0] || {
+        totalSales: 0,
+        totalRevenue: 0,
+        totalProfit: 0,
+        totalItemsSold: 0,
+        avgTransactionValue: 0,
+        avgItemsPerTransaction: 0
+      };
+    }
+
+    // Get inventory summary - for managers, only show products from their orders
+    let inventoryMatch = { storeId: new mongoose.Types.ObjectId(storeId) };
+    
+    // If user is a manager, filter to only show products from their orders
+    if (req.user.role === 'manager') {
+      const managerId = req.user._id;
+      
+      // Get products from manager's orders
+      const allOrders = await ManagerOrder.find({
+        managerId: new mongoose.Types.ObjectId(managerId),
+        storeId: new mongoose.Types.ObjectId(storeId)
+      }).select('items');
+
+      // Extract unique product IDs from all orders
+      const productIds = new Set();
+      allOrders.forEach(order => {
+        order.items.forEach(item => {
+          productIds.add(item.productId.toString());
+        });
+      });
+
+      // Convert to array of ObjectIds
+      const productObjectIds = Array.from(productIds).map(id => new mongoose.Types.ObjectId(id));
+      
+      if (productObjectIds.length > 0) {
+        inventoryMatch.productId = { $in: productObjectIds };
+      } else {
+        // No products from orders, return empty inventory
+        const inventory = {
+          totalProducts: 0,
+          totalStock: 0,
+          lowStockItems: 0,
+          outOfStockItems: 0
+        };
+      }
+    }
+
     const inventoryData = await Inventory.aggregate([
-      { $match: { storeId: new mongoose.Types.ObjectId(storeId) } },
+      { $match: inventoryMatch },
       {
         $group: {
           _id: null,
@@ -57,6 +160,8 @@ const getDashboardOverview = async (req, res) => {
       lowStockItems: 0,
       outOfStockItems: 0
     };
+    
+    console.log('📊 Final Inventory Data:', inventory);
 
     // Get staff summary
     const staffData = await StaffProfile.aggregate([
@@ -66,16 +171,33 @@ const getDashboardOverview = async (req, res) => {
           _id: null,
           totalStaff: { $sum: 1 },
           avgPerformanceRating: { $avg: '$performance.rating' },
-          totalHoursWorked: { $sum: '$attendance.totalHoursWorked' }
+          totalHoursWorked: { $sum: '$attendance.totalHoursWorked' },
+          totalDaysWorked: { $sum: '$attendance.totalDaysWorked' },
+          totalAbsences: { $sum: '$attendance.absences' }
         }
       }
     ]);
 
+    console.log('📊 Staff Data:', staffData);
+
     const staff = staffData[0] || {
       totalStaff: 0,
       avgPerformanceRating: 0,
-      totalHoursWorked: 0
+      totalHoursWorked: 0,
+      totalDaysWorked: 0,
+      totalAbsences: 0
     };
+
+    // Calculate average attendance rate
+    const totalExpectedDays = staff.totalDaysWorked + staff.totalAbsences;
+    const avgAttendanceRate = totalExpectedDays > 0 
+      ? ((staff.totalDaysWorked / totalExpectedDays) * 100).toFixed(2)
+      : 0;
+
+    // Add attendance rate to staff object
+    staff.avgAttendanceRate = parseFloat(avgAttendanceRate);
+    
+    console.log('📊 Final Staff Data:', staff);
 
     // Get task summary
     const taskData = await Task.aggregate([
@@ -151,14 +273,41 @@ const getDashboardOverview = async (req, res) => {
     previousStartDate.setDate(previousStartDate.getDate() - parseInt(period));
     const previousEndDate = new Date(startDate);
 
-    const previousSalesData = await Sale.getSalesAnalytics(storeId, previousStartDate, previousEndDate);
-    const previousSales = previousSalesData[0]?.totalRevenue || 0;
+    let previousSales = 0;
+    
+    if (req.user.role === 'manager') {
+      // For managers, use manager orders for growth calculation
+      const managerId = req.user._id;
+      
+      const previousManagerOrdersData = await ManagerOrder.aggregate([
+        {
+          $match: {
+            managerId: new mongoose.Types.ObjectId(managerId),
+            storeId: new mongoose.Types.ObjectId(storeId),
+            orderDate: { $gte: previousStartDate, $lte: previousEndDate },
+            status: { $in: ['approved', 'delivered'] }
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            totalRevenue: { $sum: '$totalAmount' }
+          }
+        }
+      ]);
+      
+      previousSales = previousManagerOrdersData[0]?.totalRevenue || 0;
+    } else {
+      // For other roles, use regular sales data
+      const previousSalesData = await Sale.getSalesAnalytics(storeId, previousStartDate, previousEndDate);
+      previousSales = previousSalesData[0]?.totalRevenue || 0;
+    }
     
     const revenueGrowth = previousSales > 0 
       ? ((salesAnalytics.totalRevenue - previousSales) / previousSales * 100).toFixed(2)
       : 0;
 
-    res.json({
+    const responseData = {
       success: true,
       data: {
         overview: {
@@ -177,7 +326,11 @@ const getDashboardOverview = async (req, res) => {
         },
         lastUpdated: new Date().toISOString()
       }
-    });
+    };
+    
+    console.log('📊 Final Response Data:', JSON.stringify(responseData, null, 2));
+    
+    res.json(responseData);
 
   } catch (error) {
     console.error('Get dashboard overview error:', error);

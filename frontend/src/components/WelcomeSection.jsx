@@ -1,241 +1,164 @@
-import React, { useState, useEffect } from 'react';
-import { Sparkles, ShoppingCart, Users, Truck, ArrowRight, Star, TrendingUp, Shield } from 'lucide-react';
+import React from 'react';
+import { Sparkles, ShoppingCart, Users, ArrowRight, TrendingUp, Shield } from 'lucide-react';
 
 const WelcomeSection = () => {
-  const [currentSlide, setCurrentSlide] = useState(0);
-  const [isVisible, setIsVisible] = useState(false);
   
   const features = [
     {
-      icon: <Sparkles className="w-8 h-8" />,
+      icon: <Sparkles className="w-6 h-6" />,
       title: "Smart Shopping Experience",
-      description: "QR code entry, barcode scanning, and contactless checkout for a seamless shopping journey",
-      color: "from-blue-500 to-purple-600"
+      description: "QR code entry, barcode scanning, and contactless checkout for a seamless shopping journey"
     },
     {
-      icon: <TrendingUp className="w-8 h-8" />,
+      icon: <TrendingUp className="w-6 h-6" />,
       title: "Real-time Analytics",
-      description: "Live inventory tracking, sales insights, and performance metrics at your fingertips",
-      color: "from-green-500 to-teal-600"
+      description: "Live inventory tracking, sales insights, and performance metrics at your fingertips"
     },
     {
-      icon: <Users className="w-8 h-8" />,
+      icon: <Users className="w-6 h-6" />,
       title: "Connected Ecosystem",
-      description: "Seamless integration connecting customers, staff, managers, and suppliers",
-      color: "from-orange-500 to-red-600"
+      description: "Seamless integration connecting customers, staff, managers, and suppliers"
     },
     {
-      icon: <Shield className="w-8 h-8" />,
+      icon: <Shield className="w-6 h-6" />,
       title: "Enterprise Security",
-      description: "Bank-level security with advanced encryption and compliance standards",
-      color: "from-indigo-500 to-blue-600"
+      description: "Bank-level security with advanced encryption and compliance standards"
     }
   ];
 
   const stats = [
-    { number: "10M+", label: "Happy Customers", icon: <Users className="w-6 h-6" /> },
-    { number: "500+", label: "Store Locations", icon: <ShoppingCart className="w-6 h-6" /> },
-    { number: "99.9%", label: "Uptime Guarantee", icon: <TrendingUp className="w-6 h-6" /> }
+    { number: "10M+", label: "Happy Customers" },
+    { number: "500+", label: "Store Locations" },
+    { number: "99.9%", label: "Uptime Guarantee" }
   ];
 
-  useEffect(() => {
-    setIsVisible(true);
-    const timer = setInterval(() => {
-      setCurrentSlide((prev) => (prev + 1) % features.length);
-    }, 4000);
-    return () => clearInterval(timer);
-  }, []);
-
   return (
-    <div className="relative overflow-hidden bg-gradient-to-br from-gray-50 via-white to-blue-50 min-h-screen">
-      {/* Animated Background Elements */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-walmart-blue/20 to-walmart-lightblue/20 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-br from-walmart-yellow/20 to-walmart-orange/20 rounded-full blur-3xl animate-pulse" style={{animationDelay: '2s'}}></div>
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gradient-to-br from-walmart-green/10 to-walmart-lightblue/10 rounded-full blur-3xl animate-pulse" style={{animationDelay: '4s'}}></div>
+    <div className="relative bg-white min-h-screen">
+      {/* Walmart-style header */}
+      <div className="bg-walmart-blue text-white py-4">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-8">
+              <img 
+                src="/walmart-logo.png" 
+                alt="Walmart" 
+                className="h-8 object-contain"
+              />
+              <div className="hidden md:flex space-x-6 text-sm">
+                <a href="#" className="hover:text-walmart-yellow transition-colors">Departments</a>
+                <a href="#" className="hover:text-walmart-yellow transition-colors">Services</a>
+                <a href="#" className="hover:text-walmart-yellow transition-colors">Account</a>
+                <a href="#" className="hover:text-walmart-yellow transition-colors">Cart</a>
+              </div>
+            </div>
+            <div className="flex items-center space-x-4">
+              <button className="bg-walmart-yellow text-walmart-blue px-4 py-2 rounded font-semibold text-sm hover:bg-yellow-300 transition-colors">
+                Sign In
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div className="relative z-10 max-w-7xl mx-auto px-4 py-16">
+      <div className="max-w-7xl mx-auto px-4 py-12">
         {/* Hero Section */}
-        <div className={`text-center mb-20 transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
-          {/* Logo and Brand */}
-          <div className="mb-8">
+        <div className="text-center mb-16">
+          {/* Main Branding */}
+          <div className="mb-10">
             <div className="flex items-center justify-center mb-6">
-              <div className="relative">
-                {/* Walmart Logo */}
-                <div className="w-32 h-20 bg-white rounded-2xl flex items-center justify-center shadow-2xl transform hover:scale-110 transition-transform duration-300 p-4">
-                  <svg 
-                    viewBox="0 0 200 80" 
-                    className="w-full h-full"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    {/* Walmart Text */}
-                    <text 
-                      x="20" 
-                      y="35" 
-                      fill="#0071ce" 
-                      fontSize="24" 
-                      fontWeight="bold" 
-                      fontFamily="Arial, sans-serif"
-                    >
-                      Walmart
-                    </text>
-                    
-                    {/* Walmart Spark/Star Icon */}
-                    <g transform="translate(150, 15)">
-                      <path 
-                        d="M25 5 L30 20 L45 20 L33 30 L38 45 L25 35 L12 45 L17 30 L5 20 L20 20 Z" 
-                        fill="#ffc220" 
-                        stroke="#ffc220" 
-                        strokeWidth="1"
-                      />
-                      <circle cx="25" cy="25" r="3" fill="#ffc220"/>
-                      <circle cx="15" cy="15" r="2" fill="#ffc220"/>
-                      <circle cx="35" cy="15" r="2" fill="#ffc220"/>
-                      <circle cx="15" cy="35" r="2" fill="#ffc220"/>
-                      <circle cx="35" cy="35" r="2" fill="#ffc220"/>
-                      <circle cx="25" cy="8" r="1.5" fill="#ffc220"/>
-                      <circle cx="25" cy="42" r="1.5" fill="#ffc220"/>
-                      <circle cx="8" cy="25" r="1.5" fill="#ffc220"/>
-                      <circle cx="42" cy="25" r="1.5" fill="#ffc220"/>
-                    </g>
-                  </svg>
-                </div>
-                <div className="absolute -top-2 -right-2 w-6 h-6 bg-walmart-yellow rounded-full flex items-center justify-center">
-                  <Sparkles className="w-3 h-3 text-walmart-blue" />
-                </div>
+              <div className="w-40 h-24 bg-white rounded-lg flex items-center justify-center shadow-md p-3">
+                <img 
+                  src="/walmart-logo.png" 
+                  alt="Walmart Digital" 
+                  className="w-full h-full object-contain"
+                />
               </div>
             </div>
             
-            <h1 className="text-5xl md:text-7xl font-bold mb-4">
-              <span className="bg-gradient-to-r from-walmart-blue via-walmart-lightblue to-walmart-blue bg-clip-text text-transparent">
-                Walmart Digital
-              </span>
+            <h1 className="text-3xl md:text-5xl font-bold mb-4 text-gray-900">
+              Walmart Digital Platform
             </h1>
             
-            <div className="inline-block bg-gradient-to-r from-walmart-yellow to-walmart-orange text-walmart-blue px-6 py-2 rounded-full text-lg font-semibold shadow-lg mb-6">
-              🚀 The Future of Retail is Here
+            <div className="inline-block bg-walmart-yellow text-walmart-blue px-6 py-2 rounded-md text-lg font-semibold mb-6">
+              Retail Management Solutions
             </div>
           </div>
 
           {/* Main Headline */}
-          <h2 className="text-3xl md:text-5xl font-bold text-gray-800 mb-6 leading-tight">
-            Welcome to the
-            <span className="block bg-gradient-to-r from-walmart-blue to-walmart-lightblue bg-clip-text text-transparent">
-              Digital Revolution
-            </span>
+          <h2 className="text-2xl md:text-4xl font-bold text-gray-800 mb-6 leading-tight">
+            Streamline Your Retail Operations
           </h2>
           
-          <p className="text-xl md:text-2xl text-gray-600 max-w-4xl mx-auto leading-relaxed mb-10">
-            Experience seamless shopping with QR code entry, contactless payments, 
-            real-time inventory, and intelligent management systems. Join millions 
-            of satisfied customers, managers, staff, and suppliers.
+          <p className="text-lg text-gray-600 max-w-3xl mx-auto leading-relaxed mb-8">
+            Manage inventory, track sales, coordinate staff, and connect with suppliers 
+            all in one integrated platform. Built for modern retail businesses.
           </p>
 
           {/* CTA Buttons */}
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16">
-            <button className="group bg-gradient-to-r from-walmart-blue to-walmart-lightblue text-white px-8 py-4 rounded-full font-semibold text-lg hover:shadow-2xl transition-all duration-300 transform hover:scale-105 flex items-center">
-              Get Started Today
-              <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12">
+            <button className="bg-walmart-blue text-white px-8 py-3 rounded font-semibold text-lg hover:bg-blue-700 transition-colors duration-200 flex items-center">
+              Start Managing
+              <ArrowRight className="w-5 h-5 ml-2" />
             </button>
-            <button className="border-2 border-walmart-blue text-walmart-blue px-8 py-4 rounded-full font-semibold text-lg hover:bg-walmart-blue hover:text-white transition-all duration-300 transform hover:scale-105">
-              Watch Demo
+            <button className="border-2 border-walmart-blue text-walmart-blue px-8 py-3 rounded font-semibold text-lg hover:bg-walmart-blue hover:text-white transition-colors duration-200">
+              View Demo
             </button>
           </div>
         </div>
 
         {/* Features Grid */}
-        <div className="mb-20">
-          <h3 className="text-3xl md:text-4xl font-bold text-center text-gray-800 mb-12">
-            Powerful Features That Transform Business
+        <div className="mb-16">
+          <h3 className="text-2xl md:text-3xl font-bold text-center text-gray-800 mb-10">
+            Platform Features
           </h3>
           
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
             {features.map((feature, index) => (
               <div 
                 key={index}
-                className={`group relative bg-white rounded-2xl p-8 shadow-lg hover:shadow-2xl transition-all duration-500 transform hover:scale-105 hover:-translate-y-2 border border-gray-100 ${
-                  currentSlide === index ? 'ring-2 ring-walmart-yellow shadow-2xl scale-105' : ''
-                }`}
-                style={{
-                  animationDelay: `${index * 0.2}s`
-                }}
+                className="bg-white rounded-lg p-6 shadow-sm border border-gray-200 hover:shadow-lg hover:border-walmart-blue transition-all duration-200"
               >
-                <div className={`w-16 h-16 bg-gradient-to-br ${feature.color} rounded-xl flex items-center justify-center text-white mb-6 group-hover:scale-110 transition-transform duration-300`}>
+                <div className="w-12 h-12 bg-walmart-blue rounded-lg flex items-center justify-center text-white mb-4">
                   {feature.icon}
                 </div>
                 
-                <h4 className="text-xl font-bold text-gray-800 mb-4 group-hover:text-walmart-blue transition-colors">
+                <h4 className="text-lg font-semibold text-gray-800 mb-3">
                   {feature.title}
                 </h4>
                 
-                <p className="text-gray-600 leading-relaxed">
+                <p className="text-gray-600 text-sm leading-relaxed">
                   {feature.description}
                 </p>
-
-                {/* Hover effect overlay */}
-                <div className="absolute inset-0 bg-gradient-to-br from-walmart-blue/5 to-walmart-lightblue/5 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               </div>
-            ))}
-          </div>
-
-          {/* Feature Indicators */}
-          <div className="flex justify-center mt-8 space-x-3">
-            {features.map((_, index) => (
-              <button
-                key={index}
-                onClick={() => setCurrentSlide(index)}
-                className={`w-3 h-3 rounded-full transition-all duration-300 ${
-                  currentSlide === index ? 'bg-walmart-blue w-8' : 'bg-gray-300 hover:bg-gray-400'
-                }`}
-              />
             ))}
           </div>
         </div>
 
         {/* Stats Section */}
-        <div className="bg-gradient-to-r from-walmart-blue to-walmart-lightblue rounded-3xl p-12 text-white mb-20">
-          <h3 className="text-3xl font-bold text-center mb-12">Trusted by Millions Worldwide</h3>
+        <div className="bg-walmart-blue rounded-lg p-8 mb-16">
+          <h3 className="text-2xl font-bold text-center text-white mb-8">Trusted by Retailers</h3>
           
           <div className="grid md:grid-cols-3 gap-8">
             {stats.map((stat, index) => (
-              <div key={index} className="text-center group">
-                <div className="flex justify-center mb-4">
-                  <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center group-hover:bg-walmart-yellow group-hover:text-walmart-blue transition-all duration-300">
-                    {stat.icon}
-                  </div>
-                </div>
-                <div className="text-4xl md:text-5xl font-bold text-walmart-yellow mb-2 group-hover:scale-110 transition-transform duration-300">
+              <div key={index} className="text-center">
+                <div className="text-3xl font-bold text-walmart-yellow mb-2">
                   {stat.number}
                 </div>
-                <div className="text-lg opacity-90">{stat.label}</div>
+                <div className="text-white opacity-90">{stat.label}</div>
               </div>
             ))}
           </div>
         </div>
 
         {/* Call to Action Section */}
-        <div className="text-center bg-white rounded-3xl p-12 shadow-2xl border border-gray-100">
-          <div className="flex justify-center mb-6">
-            <div className="flex space-x-1">
-              {[...Array(5)].map((_, i) => (
-                <Star key={i} className="w-6 h-6 text-walmart-yellow fill-current" />
-              ))}
-            </div>
-          </div>
-          
-          <h3 className="text-3xl font-bold text-gray-800 mb-4">
-            Ready to Transform Your Experience?
+        <div className="text-center bg-walmart-yellow rounded-lg p-8">
+          <h3 className="text-2xl font-bold text-walmart-blue mb-4">
+            Ready to Transform Your Business?
           </h3>
           
-          <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-            Join the digital revolution and experience the future of retail today. 
-            Choose your role below to get started.
+          <p className="text-walmart-blue mb-6 max-w-2xl mx-auto">
+            Choose your role below to access the platform and begin managing your retail operations.
           </p>
-          
-          <div className="inline-block bg-gradient-to-r from-walmart-yellow to-walmart-orange text-walmart-blue px-6 py-2 rounded-full font-semibold">
-            ⭐ Rated #1 Retail Platform 2024
-          </div>
         </div>
       </div>
     </div>
