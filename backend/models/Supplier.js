@@ -169,9 +169,7 @@ const supplierSchema = new mongoose.Schema({
 // Indexes for better performance
 supplierSchema.index({ userId: 1 });
 supplierSchema.index({ assignedStores: 1 });
-supplierSchema.index({ companyName: 1 });
 supplierSchema.index({ 'contactPerson.email': 1 });
-supplierSchema.index({ 'companyInfo.taxId': 1 });
 supplierSchema.index({ isActive: 1 });
 supplierSchema.index({ isApproved: 1 });
 supplierSchema.index({ categories: 1 });

@@ -122,7 +122,7 @@ const saleSchema = new mongoose.Schema({
   }],
   saleType: {
     type: String,
-    enum: ['regular', 'promotion', 'clearance', 'employee_discount'],
+    enum: ['regular', 'promotion', 'clearance', 'employee_discount', 'self_service'],
     default: 'regular'
   },
   channel: {
@@ -157,7 +157,6 @@ const saleSchema = new mongoose.Schema({
 });
 
 // Indexes for better performance
-saleSchema.index({ transactionId: 1 });
 saleSchema.index({ storeId: 1 });
 saleSchema.index({ customerId: 1 });
 saleSchema.index({ staffId: 1 });

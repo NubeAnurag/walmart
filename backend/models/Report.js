@@ -164,8 +164,6 @@ reportSchema.index({ createdAt: -1 });
 reportSchema.index({ 'schedule.nextRun': 1 });
 reportSchema.index({ 'schedule.isActive': 1 });
 reportSchema.index({ isTemplate: 1 });
-reportSchema.index({ expiresAt: 1 }); // For TTL
-
 // TTL index to auto-delete expired reports
 reportSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 

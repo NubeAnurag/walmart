@@ -115,12 +115,9 @@ const userSchema = new mongoose.Schema({
 });
 
 // Index for better performance
-userSchema.index({ email: 1 });
-userSchema.index({ googleId: 1 });
 userSchema.index({ role: 1 });
 userSchema.index({ isActive: 1 });
 userSchema.index({ storeId: 1 });
-userSchema.index({ employeeId: 1 });
 
 // Compound unique index to ensure only one active manager per store
 userSchema.index(

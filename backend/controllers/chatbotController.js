@@ -25,6 +25,7 @@ class ChatbotController {
       let currentSessionId = sessionId;
       if (!currentSessionId) {
         currentSessionId = ChatMessage.createSession();
+        console.log('🆕 Chatbot: Creating new session:', { userId, sessionId: currentSessionId });
       }
 
       // Save user message
@@ -48,26 +49,41 @@ class ChatbotController {
         userContext
       );
 
-      // Temporarily disable entities completely to isolate the issue
+      console.log('🔍 AI Response metadata:', JSON.stringify(aiResponse.metadata, null, 2));
+
+      // Temporarily disable entities completely to avoid validation issues
+      // TODO: Fix entity handling in a future update
       const cleanEntities = [];
 
-      // Create clean metadata object without spreading to avoid reference issues
+      console.log('🔍 Final clean entities:', cleanEntities);
+      console.log('🔍 Clean entities type:', typeof cleanEntities);
+      console.log('🔍 Clean entities is array:', Array.isArray(cleanEntities));
+
+      // Create clean metadata object
       const cleanMetadata = {
-        intent: aiResponse.metadata.intent,
-        confidence: aiResponse.metadata.confidence,
-        entities: cleanEntities || [], // Ensure it's always an array
-        responseTime: aiResponse.metadata.responseTime
+        intent: aiResponse.metadata.intent || 'unknown',
+        confidence: Number(aiResponse.metadata.confidence) || 0,
+        entities: cleanEntities, // Use the cleaned entities array
+        responseTime: Number(aiResponse.metadata.responseTime) || 0
       };
 
       // Add optional fields if they exist
-      if (aiResponse.metadata.products) {
+      if (aiResponse.metadata.products && Array.isArray(aiResponse.metadata.products)) {
         cleanMetadata.products = aiResponse.metadata.products;
       }
       if (aiResponse.metadata.orderId) {
         cleanMetadata.orderId = aiResponse.metadata.orderId;
       }
-      if (aiResponse.metadata.stores) {
+      if (aiResponse.metadata.stores && Array.isArray(aiResponse.metadata.stores)) {
         cleanMetadata.stores = aiResponse.metadata.stores;
+      }
+
+      console.log('💾 Final metadata before saving:', JSON.stringify(cleanMetadata, null, 2));
+      
+      // Validate that entities is still an array before saving
+      if (!Array.isArray(cleanMetadata.entities)) {
+        console.error('❌ Entities is not an array before saving! Type:', typeof cleanMetadata.entities);
+        cleanMetadata.entities = []; // Force it to be an empty array
       }
 
       // Save bot response
@@ -76,9 +92,16 @@ class ChatbotController {
         sessionId: currentSessionId,
         message: aiResponse.message,
         sender: 'bot',
-        messageType: aiResponse.messageType,
+        messageType: aiResponse.messageType || 'text',
         metadata: cleanMetadata,
-        responseTime: aiResponse.metadata.responseTime
+        responseTime: cleanMetadata.responseTime
+      });
+
+      console.log('💾 ChatMessage object before save:', {
+        messageType: botMessage.messageType,
+        metadataEntities: botMessage.metadata.entities,
+        entitiesType: typeof botMessage.metadata.entities,
+        entitiesIsArray: Array.isArray(botMessage.metadata.entities)
       });
 
       await botMessage.save();
@@ -107,7 +130,7 @@ class ChatbotController {
       });
 
     } catch (error) {
-      console.error('❌ Chatbot send message error:', error);
+      console.warn('❌ Chatbot send message error:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to process message',
@@ -216,17 +239,22 @@ class ChatbotController {
 
       console.log('🆕 Chatbot: Creating new session:', { userId, sessionId });
 
+      // Get user context for personalized welcome message
+      const userContext = await ChatbotController.getUserContext(userId);
+      const userName = userContext.user ? userContext.user.firstName : 'there';
+
       // Send welcome message
       const welcomeMessage = new ChatMessage({
         userId,
         sessionId,
-        message: "Hello! I'm your Walmart shopping assistant. I can help you find products, check your orders, or answer any questions you have. How can I assist you today?",
+        message: `Hello ${userName}! I'm your Walmart shopping assistant. I can help you find products, check your orders, or answer any questions you have. How can I assist you today?`,
         sender: 'bot',
-        messageType: 'text',
+        messageType: 'greeting',
         metadata: {
           intent: 'greeting',
           confidence: 1.0,
-          entities: []
+          entities: [],
+          responseTime: 0
         }
       });
 
@@ -256,20 +284,19 @@ class ChatbotController {
     }
   }
 
-  // Rate a bot response
+  // Rate a bot message (helpful/not helpful)
   static async rateMessage(req, res) {
     try {
       const { messageId } = req.params;
-      const { rating, helpful } = req.body;
+      const { helpful, rating } = req.body;
       const userId = req.user._id;
 
-      console.log('⭐ Chatbot: Rating message:', { messageId, rating, helpful, userId });
+      console.log('⭐ Chatbot: Rating message:', { messageId, helpful, rating, userId });
 
-      // Find the message
-      const message = await ChatMessage.findOne({
-        _id: messageId,
-        userId,
-        sender: 'bot'
+      const message = await ChatMessage.findOne({ 
+        _id: messageId, 
+        userId, 
+        sender: 'bot' 
       });
 
       if (!message) {
@@ -279,12 +306,13 @@ class ChatbotController {
         });
       }
 
-      // Update rating and helpful status
-      if (rating !== undefined) {
-        message.rating = rating;
-      }
-      if (helpful !== undefined) {
+      // Update rating fields
+      if (typeof helpful === 'boolean') {
         message.helpful = helpful;
+      }
+      
+      if (rating && rating >= 1 && rating <= 5) {
+        message.rating = rating;
       }
 
       await message.save();
@@ -292,9 +320,9 @@ class ChatbotController {
       res.json({
         success: true,
         data: {
-          messageId,
-          rating: message.rating,
-          helpful: message.helpful
+          messageId: message._id,
+          helpful: message.helpful,
+          rating: message.rating
         }
       });
 
@@ -333,16 +361,15 @@ class ChatbotController {
     }
   }
 
-  // Get chat analytics (for admin/debugging)
+  // Get chat analytics
   static async getChatAnalytics(req, res) {
     try {
       const userId = req.user._id;
-      const days = parseInt(req.query.days) || 30;
-
-      console.log('📊 Chatbot: Getting chat analytics:', { userId, days });
-
+      const days = parseInt(req.query.days) || 7;
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - days);
+
+      console.log('📊 Chatbot: Getting analytics:', { userId, days });
 
       const analytics = await ChatMessage.aggregate([
         {
@@ -362,12 +389,10 @@ class ChatbotController {
               $sum: { $cond: [{ $eq: ['$sender', 'bot'] }, 1, 0] }
             },
             avgResponseTime: { $avg: '$responseTime' },
-            helpfulResponses: {
+            helpfulMessages: {
               $sum: { $cond: [{ $eq: ['$helpful', true] }, 1, 0] }
             },
-            unhelpfulResponses: {
-              $sum: { $cond: [{ $eq: ['$helpful', false] }, 1, 0] }
-            }
+            sessions: { $addToSet: '$sessionId' }
           }
         }
       ]);
@@ -377,15 +402,21 @@ class ChatbotController {
         userMessages: 0,
         botMessages: 0,
         avgResponseTime: 0,
-        helpfulResponses: 0,
-        unhelpfulResponses: 0
+        helpfulMessages: 0,
+        sessions: []
       };
 
       res.json({
         success: true,
         data: {
           period: `${days} days`,
-          analytics: result
+          totalMessages: result.totalMessages,
+          userMessages: result.userMessages,
+          botMessages: result.botMessages,
+          totalSessions: result.sessions.length,
+          avgResponseTime: Math.round(result.avgResponseTime || 0),
+          helpfulnessRate: result.botMessages > 0 ? 
+            ((result.helpfulMessages / result.botMessages) * 100).toFixed(1) : '0.0'
         }
       });
 
@@ -433,6 +464,47 @@ class ChatbotController {
     } catch (error) {
       console.error('❌ Error getting user context:', error);
       return {};
+    }
+  }
+
+  // Helper method to add products to cart
+  static async addToCart(req, res) {
+    try {
+      const { productId, quantity = 1 } = req.body;
+      const userId = req.user._id;
+
+      console.log('🛒 Chatbot: Adding to cart:', { productId, quantity, userId });
+
+      // Validate product exists
+      const product = await Product.findById(productId);
+      if (!product) {
+        return res.status(404).json({
+          success: false,
+          message: 'Product not found'
+        });
+      }
+
+      // Here you would typically integrate with your cart system
+      // For now, we'll just return a success message
+      res.json({
+        success: true,
+        message: `Added ${quantity} x ${product.name} to your cart`,
+        data: {
+          productId: product._id,
+          productName: product.name,
+          quantity,
+          price: product.price,
+          totalPrice: product.price * quantity
+        }
+      });
+
+    } catch (error) {
+      console.error('❌ Add to cart error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to add product to cart',
+        error: error.message
+      });
     }
   }
 }

@@ -202,7 +202,6 @@ const managerOrderSchema = new mongoose.Schema({
 });
 
 // Indexes for better performance
-managerOrderSchema.index({ orderNumber: 1 });
 managerOrderSchema.index({ managerId: 1 });
 managerOrderSchema.index({ supplierId: 1 });
 managerOrderSchema.index({ storeId: 1 });

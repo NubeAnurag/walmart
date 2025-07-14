@@ -118,9 +118,7 @@ const staffProfileSchema = new mongoose.Schema({
 });
 
 // Indexes for better performance
-staffProfileSchema.index({ userId: 1 });
 staffProfileSchema.index({ storeId: 1 });
-staffProfileSchema.index({ employeeId: 1 });
 staffProfileSchema.index({ department: 1 });
 staffProfileSchema.index({ isActive: 1 });
 staffProfileSchema.index({ managerId: 1 });

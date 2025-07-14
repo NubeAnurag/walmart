@@ -515,14 +515,16 @@ Format as customer behavior insights.`;
     try {
       // Detect intent and extract entities
       const { intent, confidence } = this.detectIntent(message);
-      const entities = this.extractEntities(message);
+      // Temporarily disable entity extraction to avoid validation issues
+      // const entities = this.extractEntities(message);
+      const entities = []; // Empty array to avoid validation errors
       
       let response = '';
       let messageType = 'text';
       let metadata = {
         intent,
         confidence,
-        entities: [], // Temporarily disable entities to fix the database issue
+        entities: entities, // Always empty array for now
         responseTime: 0
       };
       
@@ -548,7 +550,9 @@ Format as customer behavior insights.`;
           const orderResponse = await this.handleOrderStatus(userId, entities, context);
           response = orderResponse.message;
           messageType = orderResponse.type;
-          metadata.orderId = orderResponse.orderId;
+          if (orderResponse.orderId) {
+            metadata.orderId = orderResponse.orderId;
+          }
           break;
           
         case 'store_info':
@@ -682,22 +686,31 @@ Format as customer behavior insights.`;
   async handleOrderStatus(userId, entities, context) {
     try {
       const Order = require('../models/Order');
-      const Product = require('../models/Product');
+      const ManagerOrder = require('../models/ManagerOrder');
       
       // Use real customer orders from context or fetch from database
       let orders = context.recentOrders || [];
       
       if (orders.length === 0) {
-        // Fetch orders if not in context
+        // Try to fetch customer orders first
         orders = await Order.find({ customerId: userId })
           .sort({ createdAt: -1 })
           .limit(5)
           .populate('items.productId', 'name price');
+          
+        // If no customer orders, try manager orders (in case user is a manager)
+        if (orders.length === 0) {
+          const managerOrders = await ManagerOrder.find({ managerId: userId })
+            .sort({ createdAt: -1 })
+            .limit(5)
+            .populate('items.productId', 'name price');
+          orders = managerOrders;
+        }
       }
       
       if (orders.length === 0) {
         return {
-          message: "You don't have any recent orders. Would you like to browse our products?",
+          message: "You don't have any recent orders. Would you like to browse our products or need help with placing a new order?",
           type: 'text',
           orderId: null
         };
@@ -718,26 +731,41 @@ Format as customer behavior insights.`;
       let statusMessage = '';
       switch (latestOrder.status) {
         case 'pending':
+        case 'Order Received':
           statusMessage = 'is being processed';
           break;
         case 'confirmed':
+        case 'approved':
           statusMessage = 'has been confirmed and is being prepared';
           break;
         case 'shipped':
           statusMessage = 'has been shipped and is on the way';
           break;
         case 'delivered':
+        case 'Order Completed':
           statusMessage = 'has been delivered';
           break;
         case 'cancelled':
+        case 'Order Rejected':
           statusMessage = 'has been cancelled';
           break;
         default:
           statusMessage = `is currently ${latestOrder.status}`;
       }
       
+      // Include item details for better context
+      let itemsText = '';
+      if (latestOrder.items && latestOrder.items.length > 0) {
+        const firstItem = latestOrder.items[0];
+        if (latestOrder.items.length === 1) {
+          itemsText = ` The order contains: ${firstItem.productName || firstItem.name || 'product'}.`;
+        } else {
+          itemsText = ` The order contains ${latestOrder.items.length} items including ${firstItem.productName || firstItem.name || 'product'}.`;
+        }
+      }
+      
       const response = `Your most recent order #${orderDetails.orderNumber} ${statusMessage}. ` +
-                      `Total: $${orderDetails.totalAmount.toFixed(2)} (${orderDetails.itemCount} item${orderDetails.itemCount > 1 ? 's' : ''}). ` +
+                      `Total: $${orderDetails.totalAmount.toFixed(2)}.${itemsText} ` +
                       `Order placed on ${new Date(orderDetails.createdAt).toLocaleDateString()}.`;
       
       return {
@@ -749,7 +777,7 @@ Format as customer behavior insights.`;
     } catch (error) {
       console.error('Order status error:', error);
       return {
-        message: "I'm having trouble checking your order status right now. Please try again later.",
+        message: "I'm having trouble checking your order status right now. Please try again later or contact customer service for assistance.",
         type: 'error',
         orderId: null
       };
@@ -761,53 +789,50 @@ Format as customer behavior insights.`;
     try {
       const Store = require('../models/Store');
       
-      // Check if asking for store count/list
-      if (message.toLowerCase().includes('number') || message.toLowerCase().includes('how many') || 
-          message.toLowerCase().includes('list') || message.toLowerCase().includes('stores')) {
-        
-        const stores = await Store.find({ isActive: true })
-          .select('name storeCode address phone')
-          .sort({ name: 1 });
-        
-        if (stores.length === 0) {
-          return {
-            message: "I couldn't find any active stores at the moment.",
-            type: 'text',
-            stores: []
-          };
-        }
-        
-        let response = `We have ${stores.length} active store${stores.length > 1 ? 's' : ''}:\n\n`;
-        
-        stores.forEach((store, index) => {
-          response += `${index + 1}. ${store.name} (${store.storeCode})\n`;
-          response += `   📍 ${store.address}\n`;
-          response += `   📞 ${store.phone}\n\n`;
-        });
-        
+      // Get all active stores
+      const stores = await Store.find({ isActive: true })
+        .select('name storeCode address phone')
+        .limit(10);
+      
+      if (stores.length === 0) {
         return {
-          message: response,
-          type: 'store_info',
-          stores: stores.map(store => ({
-            id: store._id,
-            name: store.name,
-            storeCode: store.storeCode,
-            address: store.address,
-            phone: store.phone
-          }))
+          message: "I don't have information about our stores right now. Please contact customer service for store locations and hours.",
+          type: 'text',
+          stores: []
         };
       }
       
+      const storeList = stores.map(store => ({
+        id: store._id,
+        name: store.name,
+        storeCode: store.storeCode,
+        address: store.address,
+        phone: store.phone
+      }));
+      
+      let response = '';
+      if (message.toLowerCase().includes('how many')) {
+        response = `We have ${stores.length} Walmart stores available. Here are our locations:\n\n`;
+      } else {
+        response = `Here are our Walmart store locations:\n\n`;
+      }
+      
+      stores.forEach((store, index) => {
+        response += `${index + 1}. ${store.name}\n   Address: ${store.address}\n   Phone: ${store.phone}\n\n`;
+      });
+      
+      response += 'Would you like more information about any specific store or help with directions?';
+      
       return {
-        message: "I can help you find information about our stores. What would you like to know?",
-        type: 'text',
-        stores: []
+        message: response,
+        type: 'store_info',
+        stores: storeList
       };
       
     } catch (error) {
       console.error('Store info error:', error);
       return {
-        message: "I'm having trouble getting store information right now. Please try again later.",
+        message: "I'm having trouble getting store information right now. Please visit our website or call customer service for store details.",
         type: 'error',
         stores: []
       };

@@ -27,4 +27,7 @@ router.post('/recommendations', ChatbotController.getProductRecommendations);
 // Get chat analytics
 router.get('/analytics', ChatbotController.getChatAnalytics);
 
+// Add product to cart
+router.post('/cart/add', ChatbotController.addToCart);
+
 module.exports = router; 

@@ -154,7 +154,6 @@ const purchaseOrderSchema = new mongoose.Schema({
 });
 
 // Indexes for better performance
-purchaseOrderSchema.index({ orderNumber: 1 });
 purchaseOrderSchema.index({ supplierId: 1 });
 purchaseOrderSchema.index({ storeId: 1 });
 purchaseOrderSchema.index({ status: 1 });

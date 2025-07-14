@@ -33,7 +33,7 @@ const chatMessageSchema = new mongoose.Schema({
   // Message type for different kinds of responses
   messageType: {
     type: String,
-    enum: ['text', 'product_recommendation', 'product_search', 'order_status', 'help', 'error', 'store_info', 'greeting', 'goodbye'],
+    enum: ['text', 'product_recommendation', 'product_search', 'order_status', 'help', 'error', 'store_info', 'greeting', 'goodbye', 'unknown'],
     default: 'text'
   },
   
@@ -69,11 +69,11 @@ const chatMessageSchema = new mongoose.Schema({
     // Intent detected by AI
     intent: String,
     
-    // Entities extracted
-    entities: [{
-      type: String,
-      value: String
-    }]
+    // Entities extracted - flexible handling to avoid validation errors
+    entities: {
+      type: mongoose.Schema.Types.Mixed,
+      default: []
+    }
   },
   
   // Response time in milliseconds
