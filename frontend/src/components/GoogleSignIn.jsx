@@ -78,7 +78,7 @@ const GoogleSignIn = ({ onSuccess, onError, className = '', text = 'Sign in with
   // Fallback button if Google script hasn't loaded yet
   const handleFallbackClick = () => {
     // Redirect to Google OAuth URL
-    window.location.href = `${process.env.REACT_APP_API_URL || 'https://walmart-pdji.onrender.com'}/api/auth/google`;
+    window.location.href = `${process.env.REACT_APP_API_URL || ''}/api/auth/google`;
   };
 
   return (
