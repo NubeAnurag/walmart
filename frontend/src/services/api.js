@@ -2,13 +2,16 @@ import axios from 'axios';
 
 // Create axios instance with default config
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || '/api',
+  baseURL: process.env.REACT_APP_API_URL || 'https://your-backend-url.onrender.com/api',
   timeout: 10000,
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
 });
+
+// Log the API base URL for debugging
+console.log('🌐 API Base URL:', api.defaults.baseURL);
 
 // Request interceptor to add auth token
 api.interceptors.request.use(

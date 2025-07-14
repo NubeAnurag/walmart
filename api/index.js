@@ -61,14 +61,15 @@ app.use(helmet({
 // CORS configuration for Vercel
 app.use(cors({
   origin: [
+    'https://walmart7768.vercel.app', // Your actual Vercel domain
     'https://walmart-digital-revolution.vercel.app',
     'https://walmart-frontend.vercel.app',
     'https://walmart.vercel.app',
-    'https://your-vercel-domain.vercel.app', // Replace with your actual Vercel domain
+    process.env.FRONTEND_URL, // Dynamic frontend URL from environment
     'http://localhost:3000', // For local development
     'http://127.0.0.1:3000',
     'http://192.168.29.4:3000'
-  ],
+  ].filter(Boolean), // Remove any undefined values
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],

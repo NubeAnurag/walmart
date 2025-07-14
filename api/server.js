@@ -68,11 +68,14 @@ app.use(helmet({
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
     ? [
+        'https://walmart7768.vercel.app', // Your actual Vercel domain
         'https://walmart-digital-revolution.vercel.app',
         'https://walmart-frontend.vercel.app',
         'https://walmart.vercel.app',
-        'https://your-vercel-domain.vercel.app' // Replace with your actual Vercel domain
-      ] 
+        process.env.FRONTEND_URL, // Dynamic frontend URL from environment
+        'https://*.vercel.app', // Allow any Vercel subdomain
+        'https://*.onrender.com' // Allow any Render subdomain
+      ].filter(Boolean) // Remove any undefined values
     : [
         'http://localhost:3000', 
         'http://127.0.0.1:3000', 
