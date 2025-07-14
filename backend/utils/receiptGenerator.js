@@ -394,7 +394,7 @@ const generateReceiptImage = async (saleData, format = 'jpeg') => {
     console.log('✅ Page content set successfully');
     
     // Wait for any fonts or styles to load
-    await page.waitForTimeout(1000);
+    await new Promise(resolve => setTimeout(resolve, 1000));
     
     // Get the receipt element dimensions
     const receiptElement = await page.$('.receipt-container');

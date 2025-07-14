@@ -59,8 +59,8 @@ const createSale = async (req, res) => {
       let cleanProductId;
       if (typeof productId === 'string' && productId.length === 24) {
         cleanProductId = productId;
-      } else if (productId && typeof productId === 'object' && productId._id) {
-        cleanProductId = productId._id.toString();
+      } else if (productId && typeof productId === 'object' && (productId._id || productId.id)) {
+        cleanProductId = (productId._id || productId.id).toString();
       } else if (productId && typeof productId === 'object' && productId.toString) {
         cleanProductId = productId.toString();
       } else {
@@ -367,9 +367,14 @@ const downloadReceipt = async (req, res) => {
 const getStoreSales = async (req, res) => {
   try {
     const { storeId } = req.params;
-    const { page = 1, limit = 10, startDate, endDate } = req.query;
+    const { page = 1, limit = 10, startDate, endDate, staffId } = req.query;
 
     let filter = { storeId };
+
+    // Add staff filter if provided
+    if (staffId) {
+      filter.staffId = staffId;
+    }
 
     // Add date filter if provided
     if (startDate || endDate) {

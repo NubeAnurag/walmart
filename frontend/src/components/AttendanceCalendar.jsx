@@ -26,11 +26,26 @@ const AttendanceCalendar = ({ staffId, onClose }) => {
     try {
       setLoading(true);
       setError(null);
+      console.log('📅 Fetching attendance data for staff:', staffId, 'year:', currentYear, 'month:', currentMonth);
+      
       const response = await managerAPI.getStaffAttendance(staffId, currentYear, currentMonth);
-      setAttendanceData(response.data);
+      console.log('📅 Attendance API response:', response);
+      
+      if (response.success && response.data) {
+        setAttendanceData(response.data);
+        console.log('📅 Attendance data set successfully:', response.data);
+      } else {
+        console.error('❌ API returned error:', response);
+        setError(response.message || 'Failed to load attendance data');
+      }
     } catch (err) {
-      console.error('Error fetching attendance data:', err);
-      setError('Failed to load attendance data');
+      console.error('❌ Error fetching attendance data:', err);
+      console.error('❌ Error details:', {
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status
+      });
+      setError('Failed to load attendance data: ' + err.message);
     } finally {
       setLoading(false);
     }
@@ -45,19 +60,36 @@ const AttendanceCalendar = ({ staffId, onClose }) => {
   const handleMarkAttendance = async (status, notes = '') => {
     try {
       setMarkingAttendance(true);
-      await managerAPI.markAttendance(staffId, {
+      console.log('📅 Marking attendance:', { staffId, date: selectedDate.date, status, notes });
+      
+      const result = await managerAPI.markAttendance(staffId, {
         date: selectedDate.date,
         status,
         notes
       });
+      
+      console.log('📅 Attendance marked successfully:', result);
       
       // Refresh attendance data
       await fetchAttendanceData();
       setShowMarkModal(false);
       setSelectedDate(null);
     } catch (err) {
-      console.error('Error marking attendance:', err);
-      alert('Failed to mark attendance');
+      console.error('❌ Error marking attendance:', err);
+      console.error('❌ Error details:', {
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status
+      });
+      
+      let errorMessage = 'Failed to mark attendance';
+      if (err.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      alert(errorMessage);
     } finally {
       setMarkingAttendance(false);
     }
@@ -109,9 +141,18 @@ const AttendanceCalendar = ({ staffId, onClose }) => {
   };
 
   const renderCalendar = () => {
-    if (!attendanceData) return null;
+    if (!attendanceData || !attendanceData.calendar) {
+      console.log('❌ No attendance data or calendar found:', attendanceData);
+      return <div className="col-span-7 text-center py-8 text-gray-500">No attendance data available</div>;
+    }
 
     const { calendar } = attendanceData;
+    
+    if (!Array.isArray(calendar)) {
+      console.log('❌ Calendar is not an array:', calendar);
+      return <div className="col-span-7 text-center py-8 text-gray-500">Invalid calendar data</div>;
+    }
+    
     const firstDay = new Date(currentYear, currentMonth - 1, 1).getDay();
     const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
     
@@ -127,6 +168,11 @@ const AttendanceCalendar = ({ staffId, onClose }) => {
     
     // Add days of the month
     calendar.forEach((dayData, index) => {
+      if (!dayData || !dayData.date) {
+        console.log('❌ Invalid day data:', dayData);
+        return;
+      }
+      
       const dayNumber = new Date(dayData.date).getDate();
       calendarDays.push(
         <div

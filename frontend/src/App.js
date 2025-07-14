@@ -8,6 +8,7 @@ import AdminPage from './pages/AdminPage';
 import AdminLoginPage from './pages/AdminLoginPage';
 import ManagerLoginPage from './pages/ManagerLoginPage';
 import StaffLoginPage from './pages/StaffLoginPage';
+import SupplierLoginPage from './pages/SupplierLoginPage';
 import ManagerDashboard from './components/ManagerDashboard';
 import SupplierDashboard from './components/SupplierDashboard';
 import StaffDashboard from './components/StaffDashboard';
@@ -163,6 +164,14 @@ function App() {
               element={
                 <PublicRoute>
                   <StaffLoginPage />
+                </PublicRoute>
+              } 
+            />
+            <Route 
+              path="/login/supplier" 
+              element={
+                <PublicRoute>
+                  <SupplierLoginPage />
                 </PublicRoute>
               } 
             />

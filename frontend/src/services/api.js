@@ -366,7 +366,10 @@ export const managerAPI = {
   markAttendance: async (staffId, attendanceData) => {
     try {
       console.log('📅 Marking attendance for staff:', staffId, attendanceData);
-      const response = await api.post(`/attendance/staff/${staffId}/mark`, attendanceData);
+      const response = await api.post('/attendance/mark', {
+        staffId,
+        ...attendanceData
+      });
       console.log('📅 Mark attendance response:', response.data);
       return response.data;
     } catch (error) {
@@ -605,6 +608,35 @@ export const inventoryAPI = {
 
 // Sales API functions
 export const salesAPI = {
+  processSale: async (saleData) => {
+    try {
+      console.log('💰 Making process sale API call to:', api.defaults.baseURL + '/sales');
+      console.log('📤 Original sale data:', saleData);
+      
+      // Transform the data to match backend expectations
+      const transformedData = {
+        customerName: `${saleData.customerInfo.firstName} ${saleData.customerInfo.lastName}`.trim(),
+        customerEmail: saleData.customerInfo.email || '',
+        customerPhone: saleData.customerInfo.phone || '',
+        items: saleData.cart.map(item => ({
+          productId: item.productId,
+          quantity: item.quantity,
+          price: item.price
+        })),
+        totalAmount: saleData.totalAmount,
+        storeId: saleData.storeId,
+        cashierId: saleData.staffId
+      };
+      
+      console.log('📤 Transformed sale data:', transformedData);
+      const response = await api.post('/sales', transformedData);
+      console.log('📥 Process sale API response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('🚨 Process sale API error:', error);
+      throw error;
+    }
+  },
   createSale: async (saleData) => {
     const response = await api.post('/sales', saleData);
     return response.data;

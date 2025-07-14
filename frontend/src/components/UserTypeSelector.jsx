@@ -11,8 +11,11 @@ import {
   Package,
   Star,
   CheckCircle,
-  Zap
+  Zap,
+  LogIn,
+  UserPlus
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 const UserTypeSelector = ({ onSelectUserType }) => {
   const [hoveredCard, setHoveredCard] = useState(null);
@@ -165,21 +168,60 @@ const UserTypeSelector = ({ onSelectUserType }) => {
                 </div>
 
                 {/* Action Button */}
-                <div className={`
-                  relative overflow-hidden
-                  bg-gradient-to-r ${type.color} text-white rounded-xl
-                  group-hover:shadow-xl transition-all duration-300
-                  ${type.hoverColor}
-                `}>
-                  <div className="relative z-10 flex items-center justify-center py-4 px-6 font-semibold">
-                    <Zap className="w-5 h-5 mr-2" />
-                    Get Started
-                    <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform duration-300" />
+                {type.id === 'supplier' ? (
+                  <div className="space-y-3">
+                    <Link
+                      to="/login/supplier"
+                      className={`
+                        relative overflow-hidden block w-full
+                        bg-gradient-to-r ${type.color} text-white rounded-xl
+                        group-hover:shadow-xl transition-all duration-300
+                        ${type.hoverColor}
+                      `}
+                    >
+                      <div className="relative z-10 flex items-center justify-center py-3 px-6 font-semibold">
+                        <LogIn className="w-5 h-5 mr-2" />
+                        Sign In
+                        <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform duration-300" />
+                      </div>
+                      
+                      {/* Button Shine Effect */}
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
+                    </Link>
+                    
+                    <button
+                      onClick={() => onSelectUserType(type.id)}
+                      className={`
+                        relative overflow-hidden block w-full
+                        bg-white text-gray-700 border-2 border-gray-200 rounded-xl
+                        group-hover:shadow-xl transition-all duration-300
+                        hover:border-gray-300 hover:bg-gray-50
+                      `}
+                    >
+                      <div className="relative z-10 flex items-center justify-center py-3 px-6 font-semibold">
+                        <UserPlus className="w-5 h-5 mr-2" />
+                        Register
+                        <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform duration-300" />
+                      </div>
+                    </button>
                   </div>
-                  
-                  {/* Button Shine Effect */}
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
-                </div>
+                ) : (
+                  <div className={`
+                    relative overflow-hidden
+                    bg-gradient-to-r ${type.color} text-white rounded-xl
+                    group-hover:shadow-xl transition-all duration-300
+                    ${type.hoverColor}
+                  `}>
+                    <div className="relative z-10 flex items-center justify-center py-4 px-6 font-semibold">
+                      <Zap className="w-5 h-5 mr-2" />
+                      Get Started
+                      <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform duration-300" />
+                    </div>
+                    
+                    {/* Button Shine Effect */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
+                  </div>
+                )}
               </div>
 
               {/* Card Glow Effect */}

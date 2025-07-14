@@ -10,8 +10,21 @@ const getStaffAttendance = async (req, res) => {
     const { staffId } = req.params;
     const { year, month, startDate, endDate } = req.query;
 
+    // Get staff profile to get hire date and other info
+    const staffProfile = await StaffProfile.findById(staffId)
+      .populate('userId', 'firstName lastName email');
+    
+    if (!staffProfile) {
+      return res.status(404).json({
+        success: false,
+        message: 'Staff member not found'
+      });
+    }
+
     // Build date filter
     let dateFilter = {};
+    let targetYear, targetMonth;
+    
     if (startDate && endDate) {
       dateFilter = {
         date: {
@@ -20,8 +33,23 @@ const getStaffAttendance = async (req, res) => {
         }
       };
     } else if (year && month) {
-      const start = new Date(year, month - 1, 1);
-      const end = new Date(year, month, 0);
+      targetYear = parseInt(year);
+      targetMonth = parseInt(month);
+      const start = new Date(targetYear, targetMonth - 1, 1);
+      const end = new Date(targetYear, targetMonth, 0);
+      dateFilter = {
+        date: {
+          $gte: start,
+          $lte: end
+        }
+      };
+    } else {
+      // Default to current month
+      const currentDate = new Date();
+      targetYear = currentDate.getFullYear();
+      targetMonth = currentDate.getMonth() + 1;
+      const start = new Date(targetYear, targetMonth - 1, 1);
+      const end = new Date(targetYear, targetMonth, 0);
       dateFilter = {
         date: {
           $gte: start,
@@ -36,11 +64,49 @@ const getStaffAttendance = async (req, res) => {
       ...dateFilter
     })
       .populate('markedBy', 'firstName lastName')
-      .sort({ date: -1 });
+      .sort({ date: 1 });
+
+    // Generate calendar with attendance data
+    const calendar = generateCalendar(targetYear, targetMonth, attendance, staffProfile.hireDate);
+    
+    // Calculate summary statistics
+    const totalWorkingDays = calendar.filter(day => !day.isWeekend && !day.isBeforeHireDate).length;
+    const presentDays = calendar.filter(day => day.attendance?.status === 'present').length;
+    const absentDays = calendar.filter(day => day.attendance?.status === 'absent').length;
+    const halfDays = calendar.filter(day => day.attendance?.status === 'halfday').length;
+    const unmarkedDays = totalWorkingDays - presentDays - absentDays - halfDays;
+    const attendanceRate = totalWorkingDays > 0 ? ((presentDays + halfDays * 0.5) / totalWorkingDays * 100).toFixed(1) : 0;
+    
+    const summary = {
+      totalWorkingDays,
+      presentDays,
+      absentDays,
+      halfDays,
+      unmarkedDays,
+      attendanceRate: parseFloat(attendanceRate)
+    };
+
+    const responseData = {
+      staff: {
+        employeeId: staffProfile.employeeId,
+        name: `${staffProfile.userId.firstName} ${staffProfile.userId.lastName}`,
+        position: staffProfile.position,
+        department: staffProfile.department,
+        hireDate: staffProfile.hireDate
+      },
+      calendar,
+      summary,
+      statistics: {
+        present: presentDays,
+        absent: absentDays,
+        halfday: halfDays,
+        total: totalWorkingDays
+      }
+    };
 
     res.json({
       success: true,
-      data: attendance
+      data: responseData
     });
 
   } catch (error) {
@@ -56,11 +122,17 @@ const getStaffAttendance = async (req, res) => {
 // Mark daily attendance for a staff member
 const markDailyAttendance = async (req, res) => {
   try {
+    console.log('📅 markDailyAttendance: Request body:', req.body);
+    console.log('📅 markDailyAttendance: Manager ID:', req.user.id);
+    
     const { staffId, date, status, checkInTime, checkOutTime, notes } = req.body;
     const managerId = req.user.id;
 
     // Validate inputs
+    console.log('📅 markDailyAttendance: Validating inputs:', { staffId, date, status });
+    
     if (!staffId || !date || !status) {
+      console.log('❌ markDailyAttendance: Missing required fields');
       return res.status(400).json({
         success: false,
         message: 'Staff ID, date, and status are required'
@@ -68,11 +140,14 @@ const markDailyAttendance = async (req, res) => {
     }
 
     if (!['present', 'absent', 'halfday'].includes(status)) {
+      console.log('❌ markDailyAttendance: Invalid status:', status);
       return res.status(400).json({
         success: false,
         message: 'Status must be one of: present, absent, halfday'
       });
     }
+    
+    console.log('✅ markDailyAttendance: Input validation passed');
 
     // Get staff profile to verify they belong to the manager's store
     const staffProfile = await StaffProfile.findById(staffId);
@@ -92,11 +167,19 @@ const markDailyAttendance = async (req, res) => {
       });
     }
 
-    // Parse the date
-    const attendanceDate = new Date(date);
-    attendanceDate.setHours(0, 0, 0, 0);
+    // Parse the date - handle timezone issues by parsing in UTC
+    console.log('📅 markDailyAttendance: Original date string:', date);
+    
+    // Parse date string in YYYY-MM-DD format to avoid timezone issues
+    const [year, month, day] = date.split('-').map(Number);
+    const attendanceDate = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
+    
+    console.log('📅 markDailyAttendance: Parsed attendance date:', attendanceDate.toISOString());
+    console.log('📅 markDailyAttendance: Local date string:', attendanceDate.toLocaleDateString());
 
     // Check if attendance already exists for this date
+    console.log('📅 markDailyAttendance: Checking for existing attendance on date:', attendanceDate.toISOString());
+    
     const existingAttendance = await Attendance.findOne({
       staffId,
       date: {
@@ -104,6 +187,11 @@ const markDailyAttendance = async (req, res) => {
         $lt: new Date(attendanceDate.getTime() + 24 * 60 * 60 * 1000)
       }
     });
+    
+    console.log('📅 markDailyAttendance: Existing attendance found:', existingAttendance ? 'Yes' : 'No');
+    if (existingAttendance) {
+      console.log('📅 markDailyAttendance: Existing attendance date:', existingAttendance.date.toISOString());
+    }
 
     let attendance;
     if (existingAttendance) {
@@ -136,6 +224,7 @@ const markDailyAttendance = async (req, res) => {
 
       await attendance.save();
       attendance = await Attendance.findById(attendance._id).populate('markedBy', 'firstName lastName');
+      console.log('📅 markDailyAttendance: Saved attendance date:', attendance.date.toISOString());
     }
 
     // Update staff performance based on new attendance

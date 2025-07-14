@@ -17,6 +17,8 @@ const register = async (req, res) => {
   try {
     const { email, password, role, firstName, lastName, phone, storeIds } = req.body;
 
+    console.log('📝 Registration attempt:', { email, role, firstName, lastName, storeIds });
+
     // Restrict manager and staff registration to admin only
     if (['manager', 'staff'].includes(role)) {
       return res.status(403).json({
@@ -50,6 +52,8 @@ const register = async (req, res) => {
       // Verify all stores exist
       const Store = require('../models/Store');
       const stores = await Store.find({ _id: { $in: storeIds }, isActive: true });
+      console.log('🏪 Stores found for supplier:', stores.length, 'out of', storeIds.length, 'requested');
+      
       if (stores.length !== storeIds.length) {
         return res.status(400).json({
           success: false,
@@ -70,6 +74,7 @@ const register = async (req, res) => {
     });
 
     await user.save();
+    console.log('✅ User created successfully:', { id: user._id, email: user.email, role: user.role });
 
     // If user is a supplier, create a supplier profile
     if (role === 'supplier') {
@@ -99,6 +104,12 @@ const register = async (req, res) => {
       });
 
       await supplierProfile.save();
+      console.log('✅ Supplier profile created successfully:', {
+        id: supplierProfile._id,
+        companyName: supplierProfile.companyName,
+        isActive: supplierProfile.isActive,
+        isApproved: supplierProfile.isApproved
+      });
     }
 
     // Generate token
@@ -112,6 +123,8 @@ const register = async (req, res) => {
       maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
     });
 
+    console.log('🎉 Registration completed successfully for:', { email, role });
+
     res.status(201).json({
       success: true,
       message: 'User registered successfully',
@@ -122,7 +135,7 @@ const register = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Registration error:', error);
+    console.error('❌ Registration error:', error);
     
     // Handle specific MongoDB errors
     if (error.code === 11000) { // Duplicate key error
@@ -161,10 +174,20 @@ const login = async (req, res) => {
   try {
     const { email, password, role, staffType } = req.body;
 
+    console.log('🔐 Login attempt:', { email, role, hasPassword: !!password });
+
     // Find user by email (includes password for verification)
     const user = await User.findOne({ email: email.toLowerCase(), isActive: true })
       .populate('storeId')
       .populate('storeIds');
+    
+    console.log('🔍 User found:', user ? {
+      id: user._id,
+      email: user.email,
+      role: user.role,
+      isActive: user.isActive,
+      hasPassword: !!user.password
+    } : 'No user found');
     
     if (!user) {
       return res.status(401).json({
@@ -175,6 +198,7 @@ const login = async (req, res) => {
 
     // Verify password
     const isPasswordValid = await user.verifyPassword(password);
+    console.log('🔐 Password verification result:', isPasswordValid);
     
     if (!isPasswordValid) {
       return res.status(401).json({
@@ -185,10 +209,49 @@ const login = async (req, res) => {
 
     // Validate role - user can only login with their registered role
     if (role && user.role !== role) {
+      console.log('❌ Role mismatch:', { requestedRole: role, actualRole: user.role });
       return res.status(403).json({
         success: false,
         message: `Access denied. You are registered as a ${user.role}, not as a ${role}. Please use the correct role to login.`
       });
+    }
+
+    // For suppliers, check if they have an approved supplier profile
+    if (user.role === 'supplier') {
+      console.log('🏪 Checking supplier profile for user:', user._id);
+      const Supplier = require('../models/Supplier');
+      const supplierProfile = await Supplier.findOne({ userId: user._id });
+      
+      console.log('🏪 Supplier profile found:', supplierProfile ? {
+        id: supplierProfile._id,
+        isActive: supplierProfile.isActive,
+        isApproved: supplierProfile.isApproved,
+        companyName: supplierProfile.companyName
+      } : 'No supplier profile found');
+      
+      if (!supplierProfile) {
+        console.log('❌ No supplier profile found for user');
+        return res.status(403).json({
+          success: false,
+          message: 'Supplier profile not found. Please contact support.'
+        });
+      }
+      
+      if (!supplierProfile.isActive) {
+        console.log('❌ Supplier profile is inactive');
+        return res.status(403).json({
+          success: false,
+          message: 'Your supplier account has been deactivated. Please contact support.'
+        });
+      }
+      
+      if (!supplierProfile.isApproved) {
+        console.log('❌ Supplier profile is not approved');
+        return res.status(403).json({
+          success: false,
+          message: 'Your supplier account is pending approval. Please wait for admin approval or contact support.'
+        });
+      }
     }
 
     // Validate staff type for staff users
@@ -219,6 +282,12 @@ const login = async (req, res) => {
       maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
     });
 
+    console.log('✅ Login successful for user:', {
+      id: user._id,
+      email: user.email,
+      role: user.role
+    });
+
     res.json({
       success: true,
       message: 'Login successful',
@@ -229,7 +298,7 @@ const login = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Login error:', error);
+    console.error('❌ Login error:', error);
     res.status(500).json({
       success: false,
       message: 'Server error during login'
