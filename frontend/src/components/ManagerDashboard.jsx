@@ -24,7 +24,17 @@ import {
   Settings,
   Building2,
   Award,
-  Warehouse
+  Warehouse,
+  Brain,
+  Zap,
+  Target,
+  TrendingDown,
+  ArrowUpRight,
+  ArrowDownRight,
+  Clock,
+  Calendar,
+  BarChart,
+  PieChart
 } from 'lucide-react';
 import { managerAPI } from '../services/api';
 import { format } from 'date-fns';
@@ -383,7 +393,8 @@ const ManagerDashboard = () => {
     { id: 'reports', label: 'Reports', icon: FileText },
     { id: 'supplier-performance', label: 'Supplier Performance', icon: Award },
     { id: 'alerts', label: 'Alerts', icon: Bell },
-    { id: 'inventory', label: 'Inventory', icon: Warehouse }
+    { id: 'inventory', label: 'Inventory', icon: Warehouse },
+    { id: 'ai-optimization', label: 'AI Optimization', icon: Brain }
   ];
 
   if (loading) {
@@ -524,6 +535,7 @@ const ManagerDashboard = () => {
         {activeTab === 'inventory' && <InventoryManagement />}
         {activeTab === 'reports' && <ReportsTab reports={reports} setReports={setReports} />}
         {activeTab === 'analytics' && <AnalyticsTab data={dashboardData} />}
+        {activeTab === 'ai-optimization' && <AIOptimizationTab />}
       </div>
     </div>
   );
@@ -2258,6 +2270,330 @@ const AlertsTab = ({ alerts }) => {
             <div>
               <p className="text-sm font-medium">New Order Received</p>
               <p className="text-xs text-gray-600">Review and approve pending orders</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// AI Optimization Tab Component
+const AIOptimizationTab = () => {
+  const [optimizationData, setOptimizationData] = useState({
+    recommendations: [
+      {
+        id: 1,
+        type: 'stock_optimization',
+        title: 'Optimize Apple MacBook Air Stock',
+        description: 'Current stock level is 5 units. AI recommends maintaining 8-12 units based on demand patterns.',
+        impact: 'high',
+        savings: '$2,400',
+        timeframe: '7 days',
+        status: 'pending'
+      },
+      {
+        id: 2,
+        type: 'demand_forecasting',
+        title: 'Increase Marshall Speaker Inventory',
+        description: 'Demand forecast shows 40% increase in next 2 weeks. Consider increasing stock by 3-5 units.',
+        impact: 'medium',
+        savings: '$1,200',
+        timeframe: '14 days',
+        status: 'in_progress'
+      },
+      {
+        id: 3,
+        type: 'seasonal_adjustment',
+        title: 'Seasonal Stock Adjustment',
+        description: 'Holiday season approaching. AI suggests increasing electronics inventory by 25%.',
+        impact: 'high',
+        savings: '$5,600',
+        timeframe: '30 days',
+        status: 'completed'
+      }
+    ],
+    insights: [
+      {
+        metric: 'Stock Turnover Rate',
+        value: '4.2',
+        change: '+0.8',
+        trend: 'up',
+        description: 'Improved from last month'
+      },
+      {
+        metric: 'Carrying Cost',
+        value: '$12,400',
+        change: '-$2,100',
+        trend: 'down',
+        description: 'Reduced by 14.5%'
+      },
+      {
+        metric: 'Stockout Rate',
+        value: '2.1%',
+        change: '-0.8%',
+        trend: 'down',
+        description: 'Below industry average'
+      },
+      {
+        metric: 'Forecast Accuracy',
+        value: '94.2%',
+        change: '+3.1%',
+        trend: 'up',
+        description: 'Excellent prediction rate'
+      }
+    ],
+    predictions: [
+      {
+        product: 'Apple MacBook Air',
+        currentStock: 5,
+        predictedDemand: 8,
+        recommendedStock: 12,
+        confidence: 92
+      },
+      {
+        product: 'Marshall Speaker',
+        currentStock: 1,
+        predictedDemand: 4,
+        recommendedStock: 6,
+        confidence: 87
+      },
+      {
+        product: 'JBL Bluetooth Speaker',
+        currentStock: 1,
+        predictedDemand: 3,
+        recommendedStock: 5,
+        confidence: 78
+      }
+    ]
+  });
+
+  const getImpactColor = (impact) => {
+    switch (impact) {
+      case 'high': return 'text-red-600 bg-red-50 border-red-200';
+      case 'medium': return 'text-yellow-600 bg-yellow-50 border-yellow-200';
+      case 'low': return 'text-green-600 bg-green-50 border-green-200';
+      default: return 'text-gray-600 bg-gray-50 border-gray-200';
+    }
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'completed': return 'text-green-600 bg-green-50';
+      case 'in_progress': return 'text-blue-600 bg-blue-50';
+      case 'pending': return 'text-yellow-600 bg-yellow-50';
+      default: return 'text-gray-600 bg-gray-50';
+    }
+  };
+
+  const getTrendIcon = (trend) => {
+    return trend === 'up' ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />;
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">AI Inventory Optimization</h2>
+          <p className="text-gray-600">Leverage artificial intelligence to optimize your inventory management</p>
+        </div>
+        <button className="btn btn-primary">
+          <Zap className="w-4 h-4 mr-2" />
+          Run AI Analysis
+        </button>
+      </div>
+
+      {/* AI Insights Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {optimizationData.insights.map((insight, index) => (
+          <div key={index} className="bg-white p-6 rounded-lg shadow">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-blue-600 rounded-lg flex items-center justify-center">
+                <Brain className="w-5 h-5 text-white" />
+              </div>
+              <div className={`flex items-center space-x-1 px-2 py-1 rounded-full text-sm font-medium ${
+                insight.trend === 'up' ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50'
+              }`}>
+                {getTrendIcon(insight.trend)}
+                <span>{insight.change}</span>
+              </div>
+            </div>
+            <h3 className="text-sm font-medium text-gray-600 mb-1">{insight.metric}</h3>
+            <p className="text-2xl font-bold text-gray-900 mb-1">{insight.value}</p>
+            <p className="text-xs text-gray-500">{insight.description}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* AI Recommendations */}
+      <div className="bg-white rounded-lg shadow">
+        <div className="p-6 border-b border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-900">AI Recommendations</h3>
+          <p className="text-sm text-gray-600">Smart suggestions to optimize your inventory</p>
+        </div>
+        <div className="p-6">
+          <div className="space-y-4">
+            {optimizationData.recommendations.map((recommendation) => (
+              <div key={recommendation.id} className="border border-gray-200 rounded-lg p-4">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-3 mb-2">
+                      <h4 className="font-medium text-gray-900">{recommendation.title}</h4>
+                      <span className={`px-2 py-1 text-xs font-medium rounded-full border ${getImpactColor(recommendation.impact)}`}>
+                        {recommendation.impact} impact
+                      </span>
+                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(recommendation.status)}`}>
+                        {recommendation.status.replace('_', ' ')}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-600 mb-3">{recommendation.description}</p>
+                    <div className="flex items-center space-x-4 text-sm">
+                      <div className="flex items-center space-x-1">
+                        <DollarSign className="w-4 h-4 text-green-600" />
+                        <span className="text-green-600 font-medium">Save {recommendation.savings}</span>
+                      </div>
+                      <div className="flex items-center space-x-1">
+                        <Clock className="w-4 h-4 text-gray-400" />
+                        <span className="text-gray-500">{recommendation.timeframe}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex space-x-2">
+                    <button className="btn btn-sm btn-primary">Apply</button>
+                    <button className="btn btn-sm btn-secondary">Dismiss</button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Demand Predictions */}
+      <div className="bg-white rounded-lg shadow">
+        <div className="p-6 border-b border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-900">Demand Predictions</h3>
+          <p className="text-sm text-gray-600">AI-powered demand forecasting for next 30 days</p>
+        </div>
+        <div className="p-6">
+          <div className="overflow-x-auto">
+            <table className="min-w-full">
+              <thead>
+                <tr className="border-b border-gray-200">
+                  <th className="text-left py-3 px-4 font-medium text-gray-900">Product</th>
+                  <th className="text-center py-3 px-4 font-medium text-gray-900">Current Stock</th>
+                  <th className="text-center py-3 px-4 font-medium text-gray-900">Predicted Demand</th>
+                  <th className="text-center py-3 px-4 font-medium text-gray-900">Recommended Stock</th>
+                  <th className="text-center py-3 px-4 font-medium text-gray-900">Confidence</th>
+                  <th className="text-center py-3 px-4 font-medium text-gray-900">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {optimizationData.predictions.map((prediction, index) => (
+                  <tr key={index} className="border-b border-gray-100">
+                    <td className="py-4 px-4">
+                      <div className="font-medium text-gray-900">{prediction.product}</div>
+                    </td>
+                    <td className="py-4 px-4 text-center">
+                      <span className={`px-2 py-1 rounded-full text-sm font-medium ${
+                        prediction.currentStock < prediction.predictedDemand 
+                          ? 'bg-red-100 text-red-800' 
+                          : 'bg-green-100 text-green-800'
+                      }`}>
+                        {prediction.currentStock}
+                      </span>
+                    </td>
+                    <td className="py-4 px-4 text-center">
+                      <span className="text-gray-900 font-medium">{prediction.predictedDemand}</span>
+                    </td>
+                    <td className="py-4 px-4 text-center">
+                      <span className="text-blue-600 font-medium">{prediction.recommendedStock}</span>
+                    </td>
+                    <td className="py-4 px-4 text-center">
+                      <div className="flex items-center justify-center">
+                        <div className="w-16 bg-gray-200 rounded-full h-2 mr-2">
+                          <div 
+                            className="bg-gradient-to-r from-green-400 to-blue-500 h-2 rounded-full"
+                            style={{ width: `${prediction.confidence}%` }}
+                          ></div>
+                        </div>
+                        <span className="text-sm text-gray-600">{prediction.confidence}%</span>
+                      </div>
+                    </td>
+                    <td className="py-4 px-4 text-center">
+                      <button className="btn btn-sm btn-primary">Order</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      {/* AI Performance Metrics */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h3 className="text-lg font-semibold mb-4">AI Model Performance</h3>
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-600">Forecast Accuracy</span>
+              <span className="text-lg font-semibold text-green-600">94.2%</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div className="bg-green-500 h-2 rounded-full" style={{ width: '94.2%' }}></div>
+            </div>
+            
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-600">Cost Savings</span>
+              <span className="text-lg font-semibold text-blue-600">$9,200</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div className="bg-blue-500 h-2 rounded-full" style={{ width: '85%' }}></div>
+            </div>
+            
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-600">Stockout Reduction</span>
+              <span className="text-lg font-semibold text-purple-600">67%</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div className="bg-purple-500 h-2 rounded-full" style={{ width: '67%' }}></div>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h3 className="text-lg font-semibold mb-4">Optimization Timeline</h3>
+          <div className="space-y-4">
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                <CheckCircle className="w-4 h-4 text-green-600" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-900">AI Model Training</p>
+                <p className="text-xs text-gray-500">Completed 2 days ago</p>
+              </div>
+            </div>
+            
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                <Target className="w-4 h-4 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-900">Demand Analysis</p>
+                <p className="text-xs text-gray-500">In progress</p>
+              </div>
+            </div>
+            
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
+                <Calendar className="w-4 h-4 text-gray-400" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-500">Next Optimization</p>
+                <p className="text-xs text-gray-400">Scheduled for tomorrow</p>
+              </div>
             </div>
           </div>
         </div>
