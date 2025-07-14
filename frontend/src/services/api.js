@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Create axios instance with default config
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'https://your-backend-url.onrender.com/api',
+  baseURL: process.env.REACT_APP_API_URL || 'https://walmart-1-rnyh.onrender.com/api',
   timeout: 10000,
   withCredentials: true,
   headers: {
@@ -12,6 +12,7 @@ const api = axios.create({
 
 // Log the API base URL for debugging
 console.log('🌐 API Base URL:', api.defaults.baseURL);
+console.log('🌐 Environment API URL:', process.env.REACT_APP_API_URL);
 
 // Request interceptor to add auth token
 api.interceptors.request.use(
